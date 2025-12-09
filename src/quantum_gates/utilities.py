@@ -14,3 +14,5 @@ from ._utility.simulations_utility import (
 )
 
 from ._utility.circ_optimizer import Optimizer
+from ._utility.surface_code import SurfaceCode
+from ._utility.rotated_surface_code import RotatedSurfaceCode
