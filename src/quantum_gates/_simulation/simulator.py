@@ -162,7 +162,6 @@ class MrAndersonSimulator(object):
         
         # --- Build mid-circuit bitstrings with chronological processing ---
         combined_mid_strings = []
-        mid_statevector_readout = []
         barrier_statevectors = []
 
         for shot in all_results:
@@ -177,8 +176,6 @@ class MrAndersonSimulator(object):
                 for c, val in zip(event["clbits"], event["outcome"]):
                     clbit_values[c] = str(val)
                 
-                mid_statevector_readout.append(event["mid_statevector"])
-
             # sort descending by clbit index (Aer display order)
             bitstring = ''.join(clbit_values[::-1])
             combined_mid_strings.append(bitstring)
@@ -194,7 +191,6 @@ class MrAndersonSimulator(object):
             "results": all_results, # mid-circuit measurement results
             "num_clbits": num_clbits, # number of classical bits in circuit
             "mid_counts": dict(mid_counts), # mid-circuit measurement counts
-            "mid_statevector_readout": mid_statevector_readout, # saved statevectors if any
             "barrier_statevectors": barrier_statevectors, # saved statevectors at barriers if any
         }
     
@@ -211,14 +207,9 @@ class MrAndersonSimulator(object):
 
         for instr in circ.data:
             name = instr.operation.name
-            if name == "delay":
+            if name == "delay" or name == "barrier":
                 continue
             
-            if name == "barrier":
-                #print(" -- barrier found in layout; -- ")
-                #print(instr.label)
-                continue
-
             # record qubits touched by this instruction (any arity)
             for qb in instr.qubits:
                 used.add(qb._index)
@@ -374,7 +365,6 @@ class MrAndersonSimulator(object):
             elif op_name == "barrier":
                 # check if we have a save_statevector with this barrier label
                 if op.label is not None and 'save' in op.label: # save statevector with barrier FANCY GATE
-                    #print(" -- save_statevector found in layout; ", op.label)
                     if current_chunk:
                         data.append((current_chunk, 0))
                         current_chunk = []
@@ -679,7 +669,7 @@ def _single_shot(args: dict) -> np.array:
             psi = circ.statevector(psi)
             circ.reset(phase_reset=False)  # reset internal state for next chunk
 
-        elif flag == 1:
+        elif flag == 1: # flag == 1 means fancy gate
             
             if isinstance(d, tuple) and d[0] == "mid_measurement":
                 op = d[1]
@@ -702,7 +692,6 @@ def _single_shot(args: dict) -> np.array:
                     "qubits": qubits,
                     "clbits": clbits,
                     "outcome": outcome,
-                    "mid_statevector": psi.copy(),
                 })
 
             elif isinstance(d, tuple) and d[0] == "reset_qubits":
@@ -743,8 +732,6 @@ def _single_shot(args: dict) -> np.array:
                 # handle save_statevector with barrier label
                 if d.label is not None and 'save' in d.label:
                     # save current statevector
-                    print(" -- saving statevector at barrier; ", d.label)
-                    print(psi.copy())
                     barrier_statevectors.append((d.label, psi.copy()))
             
             else:
