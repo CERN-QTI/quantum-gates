@@ -761,8 +761,6 @@ def _single_shot(args: dict) -> np.array:
     # mid_measurement results in Qiskit clbit order
     qiskit_order_mid_results = mid_results[::-1]  
     
-    # TODO permute the SV here to be like Qiskit (big-endian)
-
     # --- Final Measurements ---
     # Born rule → probability distribution
     shot_result = np.square(np.abs(psi))

@@ -9,6 +9,7 @@ from qiskit_aer import AerSimulator
 from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit.circuit.random import random_circuit
 from qiskit.providers.backend import BackendV2 as Backend
+from qiskit.quantum_info import Statevector
 
 
 def fix_counts(counts_0: dict, n_qubits: int) -> dict:
@@ -264,3 +265,44 @@ def transpile_qiskit_circuit(circ : QuantumCircuit, init_layout: list, seed: int
         )
 
         return t_circ
+
+
+def sv_normal_to_qiskit(sv):
+    """
+    Convert a statevector from 'normal' ordering (q0 is MSB)
+    into Qiskit ordering (q0 is LSB).
+
+    Normal ordering basis: |q0 q1 ... q(n-1)>
+    Qiskit ordering basis: |q(n-1) ... q1 q0>
+
+    Parameters
+    ----------
+    sv : np.ndarray or Statevector
+        Input statevector in normal ordering.
+
+    Returns
+    -------
+    np.ndarray
+        Statevector reordered into Qiskit conventions.
+    """
+    # Convert Statevector → array
+    if isinstance(sv, Statevector):
+        arr = sv.data
+    else:
+        arr = np.asarray(sv)
+
+    # Determine number of qubits
+    N = int(np.log2(arr.size))
+    if 2**N != arr.size:
+        raise ValueError("Input statevector length is not a power of 2.")
+
+    # Reshape into tensor: (2, 2, ..., 2)
+    tensor = arr.reshape([2] * N)
+
+    # Reverse axes to flip qubit significance
+    tensor_qiskit = np.transpose(tensor, axes=range(N-1, -1, -1))
+
+    # Return flattened statevector
+    return tensor_qiskit.reshape(-1)
+
+
