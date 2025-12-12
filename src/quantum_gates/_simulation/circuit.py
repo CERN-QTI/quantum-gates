@@ -553,7 +553,6 @@ class AlternativeCircuit(object):
         """
         dim = psi0.shape[0]
         n = int(np.log2(dim))
-        
         # Device params (kept for optional noise hooks)
         T1, T2, p, rout, p_int, t_int, tm, dt = (
             device_param["T1"],

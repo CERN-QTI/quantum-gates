@@ -9,7 +9,6 @@ from quantum_gates.utilities import DeviceParameters
 import numpy as np
 import matplotlib.pyplot as plt
 import pymatching
-import pymatching
 from scipy.sparse import lil_matrix
 from qiskit.circuit.controlflow import ControlFlowOp 
 
@@ -48,10 +47,12 @@ class RotatedSurfaceCode:
         self.data_qubits = [global_idx for (row, global_idx) in data_qubits]
 
 
-        # maps stabilizer index -> list of classical bit indices (one per cycle)
+        # Sort stabilizers by global_index (second element of tuple)
+        sorted_stabilizers = sorted(self.stabilizers, key=lambda x: x[1])
+
+        # Create mapping with classical indices 0-7
         self.stabilizer_to_clbits = {
-            stab: [cycle * self.n_stabilizers + i for cycle in range(self.cycles)]
-            for i, stab in enumerate(self.stabilizers)
+            stab: [i] for i, stab in enumerate(sorted_stabilizers)
         }
 
         print("Stabilizers:", self.stabilizers)
@@ -63,7 +64,7 @@ class RotatedSurfaceCode:
 
         self._build_stabilizer_layer()
         # Compute stabilizer connections BEFORE setting up decoder
-        self.stabilizer_connections = self._compute_stabilizer_connections()
+        self.stabilizer_to_dqubits = self._compute_stabilizer_connections()
     
         # Now setup the decoder (needs x_stabilizers, z_stabilizers, and stabilizer_connections)
         self.setup_decoder()
@@ -238,10 +239,6 @@ class RotatedSurfaceCode:
                 # entangle with data qubits (data is control, ancilla target)
             neighbors = self.neighbors[anc]
             connections[stab] = neighbors
-            
-            # Debug print
-            stab_type = 'X' if stab in self.x_stabilizers else 'Z'
-            print(f"Stabilizer {stab} ({stab_type}) measures data qubits: {neighbors}")
         return connections
     
 
@@ -251,16 +248,18 @@ class RotatedSurfaceCode:
         Returns separate arrays for X and Z stabilizers.
         """
         bits = bitstring[::-1]  # reverse Qiskit order
-        
+        print("Extracting stabilizer measurements from bitstring:", bits)
         x_syndromes = np.zeros((self.cycles, len(self.x_stabilizers)), dtype=int)
         z_syndromes = np.zeros((self.cycles, len(self.z_stabilizers)), dtype=int)
-        
+
         for i, stab in enumerate(self.x_stabilizers):
             clbits = self.stabilizer_to_clbits[stab]
+            print("clbits for X stabilizer", stab, ":", clbits)
             x_syndromes[:, i] = [int(bits[cb]) for cb in clbits]
         
         for i, stab in enumerate(self.z_stabilizers):
             clbits = self.stabilizer_to_clbits[stab]
+            print("clbits for Z stabilizer", stab, ":", clbits)
             z_syndromes[:, i] = [int(bits[cb]) for cb in clbits]
         
         return x_syndromes, z_syndromes
@@ -281,18 +280,23 @@ class RotatedSurfaceCode:
         
 
         needs_controlflow = any(isinstance(op.operation, ControlFlowOp) for op in self.qc.data)
+        
+        # Get backend's coupling map edges
+        backend_coupling = backend.coupling_map
+
         cm = CouplingMap([(i, i+1) for i in range(self.n_qubits - 1)])
 
         t_circ = transpile(
             self.qc,
             backend = None,
-            basis_gates=['cx', 'rz', 'sx','x'],
+            basis_gates=['ecr', 'rz', 'sx','x'],
             coupling_map=cm,
             initial_layout=list(range(self.n_qubits)),
             seed_transpiler=42,
             scheduling_method=needs_controlflow,      
 
         )
+
 
         # Check which qubits are actually used in transpiled circuit
         used_qubits: list[int] = []
@@ -317,7 +321,43 @@ class RotatedSurfaceCode:
         device_param = DeviceParameters(list(range(nqubit_actual)))
         device_param.load_from_backend(backend)
         device_param_lookup = device_param.__dict__()
+        # The standard t_int value for allowed ECR gates
+        t_int_value = 6.6e-07
+        #Add t_int values for all consecutive qubit pairs
+        # Get average p_int
+        non_zero_p_int =  device_param_lookup['p_int'][ device_param_lookup['p_int'] != 0]
+        avg_p_int = np.mean(non_zero_p_int) if len(non_zero_p_int) > 0 else 0.01
 
+        print(f"Using average p_int: {avg_p_int}")
+
+        for i in range(self.n_qubits - 1):
+            # Add both directions for the ECR gate
+            device_param_lookup['t_int'][i, i+1] = t_int_value
+            device_param_lookup['t_int'][i+1, i] = t_int_value
+
+            if device_param_lookup['p_int'][i, i+1] == 0:
+                # Look for nearest existing edge with p_int value
+                found_p_int = None
+                
+                # Check adjacent qubits first
+                for offset in [1, 2, 3]:
+                    if i - offset >= 0 and device_param_lookup['p_int'][i-offset, i-offset+1] != 0:
+                        found_p_int = device_param_lookup['p_int'][i-offset, i-offset+1]
+                        break
+                    if i + offset < self.n_qubits - 1 and device_param_lookup['p_int'][i+offset, i+offset+1] != 0:
+                        found_p_int = device_param_lookup['p_int'][i+offset, i+offset+1]
+                        break
+                
+                # Fall back to average if no nearby edge found
+                if found_p_int is None:
+                    print("Warning: No nearby p_int found")
+                    found_p_int = avg_p_int
+                
+                device_param_lookup['p_int'][i, i+1] = found_p_int
+                device_param_lookup['p_int'][i+1, i] = found_p_int
+                print(f"Set p_int for edge ({i},{i+1}): {found_p_int}")
+
+        print("Device parameters loaded for qubits:", device_param_lookup)
         res  = sim.run( 
             t_qiskit_circ=t_circ,  
             psi0=initial_psi, 
@@ -332,48 +372,27 @@ class RotatedSurfaceCode:
         num_clbits = res["num_clbits"]
         mid_counts = res["mid_counts"]
         statevector_readout = res["statevector_readout"]
-        """
-        processed_counts = {}
 
+        # --- Process mid_counts to separate registers ---
+        register_size= [self.n_data]+ [self.n_stabilizers]*self.cycles 
+        
+        processed_counts = self._split_counts(mid_counts, register_size)
+        
         for bitstring, count in mid_counts.items():
 
             bitstring = bitstring.strip()
-
-            # first n_data bits → data bits
-            data_bits = bitstring[:self.n_data]
-
-            # remaining bits → syndrome bits
             syndrome_bits = bitstring[self.n_data:]
-
-            # Split based on register boundaries
-            idx = 0
-            bit_chunks = []
-
-            # qc.cregs contains ALL classical registers IN ORDER:
-            # [c_ancilla_0, c_ancilla_1, ..., c_ancilla_{cycles-1}, c_data]
-            
-            for creg in self.qc.cregs:
-                size = creg.size
-                chunk = bitstring[idx : idx + size]
-                bit_chunks.append(chunk)
-                idx += size
-
-            # Produce Aer-style spaced output
-            pretty_bitstring = " ".join(bit_chunks)
-
-            processed_counts[pretty_bitstring] = count
-
             predictions_x, predictions_z = self.decode_full(syndrome_bits)
             final_x_correction = np.bitwise_xor.reduce(predictions_x, axis=0)
             final_z_correction = np.bitwise_xor.reduce(predictions_z, axis=0)
 
-            print("Original data bits:", data_bits)
+            
             print("Syndrome bits:", syndrome_bits)
             print("Final X corrections:", final_x_correction)
             print("Final Z corrections:", final_z_correction)
 
             for i in range(len(predictions_x)): 
-                print(  f"Data qubit {i}: original {data_bits[i]}, "
+                print( 
                         f"X prediction {final_x_correction[i]}, "
                         f"Z prediction {final_z_correction[i]}"
                     )
@@ -381,24 +400,9 @@ class RotatedSurfaceCode:
                 if final_x_correction[i] == 1:
                     new_bit = '1' if data_bits[i] == '0' else '0'
                     data_bits = data_bits[:i] + new_bit + data_bits[i+1:]
-            
-            syndrome_dict = {}
 
-            for (syndrome_bits, data_bits), count in processed_counts.items():
-                if syndrome_bits not in syndrome_dict:
-                    syndrome_dict[syndrome_bits] = 0
-                syndrome_dict[syndrome_bits] += count
-
-            syndrome_counts = { self.pretty(k): v for k, v in syndrome_dict.items() }
-
-            
-
-        mid_counts = processed_counts
-
-        """
-        register_size= [self.n_data]+ [self.n_stabilizers]*self.cycles 
         
-        return self._split_counts(mid_counts, register_size), t_circ
+        return processed_counts, t_circ
 
     def _split_counts(self, raw_counts: dict, register_sizes: list) -> dict:
         """
@@ -435,40 +439,25 @@ class RotatedSurfaceCode:
             
         return processed_counts
 
-    def pretty(self, s):
-        return " ".join(s[i:i+self.n_stabilizers] for i in range(0, len(s), self.n_stabilizers))
 
-
+# ========================================================================
+#  PLOTTING METHODS
+#  ========================================================================
    
-    def analyze_results(self, counts):
+    def analyze_results(self, processed_counts):
         """
-        Analyze measurement results using stabilizer-to-classical-bit mapping.
-        Returns a dict: stabilizer → {bitstring_pattern: frequency}.
+        Pretty-print the already-processed measurement counts.
+        Returns counts organized by cycle.
         """
-        results = {stab: {} for stab in (self.x_stabilizers + self.z_stabilizers)}
-
-        for bitstring, count in counts.items():
-            # Use the helper function
-            x_syndromes, z_syndromes = self._extract_stabilizer_measurements(bitstring)
-            
-            # Process X stabilizers
-            for i, stab in enumerate(self.x_stabilizers):
-                # Get measurements for this stabilizer across all cycles
-                bits_for_stab = tuple(x_syndromes[:, i])
-                results[stab][bits_for_stab] = results[stab].get(bits_for_stab, 0) + count
-            
-            # Process Z stabilizers
-            for i, stab in enumerate(self.z_stabilizers):
-                bits_for_stab = tuple(z_syndromes[:, i])
-                results[stab][bits_for_stab] = results[stab].get(bits_for_stab, 0) + count
-
-        # pretty string output
-        pretty = {
-            stab: {','.join(map(str, k)): v for k, v in res.items()} 
-            for stab, res in results.items()
-        }
-
-        return pretty
+        results_by_cycle = {}
+        for bitstring, count in processed_counts.items():
+            cycle_measurements = bitstring.split()
+            for cycle_idx, cycle_bits in enumerate(cycle_measurements):
+                if cycle_idx not in results_by_cycle:
+                    results_by_cycle[cycle_idx] = {}
+                results_by_cycle[cycle_idx][cycle_bits] = results_by_cycle[cycle_idx].get(cycle_bits, 0) + count
+        
+        return results_by_cycle
 
     def _plot_single_shot(self, bitstring, shot_idx=None):
         """Plot single-shot stabilizer measurements timeline."""
@@ -587,12 +576,11 @@ class RotatedSurfaceCode:
         H = lil_matrix((n_stabs, n_data), dtype=int)
 
         for i, stab in enumerate(stabs):
-            data_qubits = self.stabilizer_connections[stab]
+            data_qubits = self.stabilizer_to_dqubits[stab]
             for dq in data_qubits:
                 data_idx = self.data_qubits.index(dq)
                 H[i, data_idx] = 1
         
-        print(f"Parity-check matrix for {stabilizer_type} stabilizers built.")
         print(H.toarray())
         return H.tocsr()
     

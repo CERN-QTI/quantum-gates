@@ -658,6 +658,7 @@ def _single_shot(args: dict) -> np.array:
                 op = d[1]
                 qubits  = op["q_idx"]
                 clbits  = op["c_idx"]
+
                 # Perform the mid-circuit measurement
                 psi, outcome = circ.mid_measurement(psi, device_param, add_bitflip=bit_flip_bool, qubit_list=qubits, cbit_list = clbits)
                 
