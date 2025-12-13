@@ -2,6 +2,7 @@ import pytest
 import random
 import numpy as np
 from qiskit import QuantumCircuit
+from qiskit_ibm_runtime.fake_provider import FakeBrisbane, FakeKyoto
 
 from src.quantum_gates.utilities import create_random_quantum_circuit, transpile_qiskit_circuit, setup_backend,fix_counts
 from src.quantum_gates.utilities import Optimizer
@@ -22,7 +23,9 @@ backend_config = {
     "crn" : CRN
 }
 
-backend = setup_backend(IBM_TOKEN, **backend_config)
+#backend = setup_backend(IBM_TOKEN, **backend_config)
+
+backend = setup_backend(device_name=FakeBrisbane(), use_fake=True)
 
 location = "tests/helpers/device_parameters/ibm_kyoto/"
 

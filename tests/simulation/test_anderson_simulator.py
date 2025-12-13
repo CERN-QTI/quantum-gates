@@ -13,9 +13,10 @@ from src.quantum_gates.gates import standard_gates, noise_free_gates
 from src.quantum_gates._gates.gates import numerical_gates, almost_noise_free_gates
 from src.quantum_gates.utilities import DeviceParameters
 import tests.helpers.functions as helper_functions
+from qiskit_ibm_runtime.fake_provider import FakeBrisbane, FakeKyoto
 
 
-backend_name = "ibm_brisbane"
+"""backend_name = "ibm_brisbane"
 backend_config = {
     "hub": HUB,
     "group": GROUP,
@@ -23,7 +24,9 @@ backend_config = {
     "device_name": backend_name,
     "crn": CRN
 }
-backend = setup_backend(IBM_TOKEN, **backend_config)
+backend = setup_backend(IBM_TOKEN, **backend_config)"""
+
+backend = setup_backend(device_name=FakeBrisbane(), use_fake=True)
 
 circuit_set = [Circuit, StandardCircuit, EfficientCircuit, OneCircuit, BinaryCircuit]
 gates_set = [standard_gates, numerical_gates, almost_noise_free_gates]
