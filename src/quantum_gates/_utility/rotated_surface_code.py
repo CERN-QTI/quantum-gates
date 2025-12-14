@@ -251,16 +251,17 @@ class RotatedSurfaceCode:
         print("Extracting stabilizer measurements from bitstring:", bits)
         x_syndromes = np.zeros((self.cycles, len(self.x_stabilizers)), dtype=int)
         z_syndromes = np.zeros((self.cycles, len(self.z_stabilizers)), dtype=int)
-
-        for i, stab in enumerate(self.x_stabilizers):
-            clbits = self.stabilizer_to_clbits[stab]
-            print("clbits for X stabilizer", stab, ":", clbits)
-            x_syndromes[:, i] = [int(bits[cb]) for cb in clbits]
-        
-        for i, stab in enumerate(self.z_stabilizers):
-            clbits = self.stabilizer_to_clbits[stab]
-            print("clbits for Z stabilizer", stab, ":", clbits)
-            z_syndromes[:, i] = [int(bits[cb]) for cb in clbits]
+        for c in range(self.cycles):
+            for i, stab in enumerate(self.x_stabilizers):
+                print("Processing X stabilizer:", stab)
+                print("Mapped to classical bits:", self.stabilizer_to_clbits[stab])
+                print("i:", i)
+                clbits = self.stabilizer_to_clbits[stab][0]+ c * self.n_stabilizers
+                x_syndromes[c, i] = int(bits[clbits]) 
+            
+            for i, stab in enumerate(self.z_stabilizers):
+                clbits = self.stabilizer_to_clbits[stab][0]+ c * self.n_stabilizers
+                z_syndromes[c, i] = int(bits[clbits])
         
         return x_syndromes, z_syndromes
 
@@ -328,8 +329,6 @@ class RotatedSurfaceCode:
         non_zero_p_int =  device_param_lookup['p_int'][ device_param_lookup['p_int'] != 0]
         avg_p_int = np.mean(non_zero_p_int) if len(non_zero_p_int) > 0 else 0.01
 
-        print(f"Using average p_int: {avg_p_int}")
-
         for i in range(self.n_qubits - 1):
             # Add both directions for the ECR gate
             device_param_lookup['t_int'][i, i+1] = t_int_value
@@ -355,9 +354,7 @@ class RotatedSurfaceCode:
                 
                 device_param_lookup['p_int'][i, i+1] = found_p_int
                 device_param_lookup['p_int'][i+1, i] = found_p_int
-                print(f"Set p_int for edge ({i},{i+1}): {found_p_int}")
 
-        print("Device parameters loaded for qubits:", device_param_lookup)
         res  = sim.run( 
             t_qiskit_circ=t_circ,  
             psi0=initial_psi, 
@@ -621,7 +618,7 @@ class RotatedSurfaceCode:
         """
         if isinstance(bitstring, dict):
             bitstring = list(bitstring.keys())[0]
-
+        
         x_syndromes, z_syndromes = self._extract_stabilizer_measurements(bitstring)
         print("Extracted X syndromes:\n", x_syndromes)
         print("Extracted Z syndromes:\n", z_syndromes)
