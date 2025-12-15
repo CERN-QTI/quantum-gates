@@ -253,9 +253,6 @@ class RotatedSurfaceCode:
         z_syndromes = np.zeros((self.cycles, len(self.z_stabilizers)), dtype=int)
         for c in range(self.cycles):
             for i, stab in enumerate(self.x_stabilizers):
-                print("Processing X stabilizer:", stab)
-                print("Mapped to classical bits:", self.stabilizer_to_clbits[stab])
-                print("i:", i)
                 clbits = self.stabilizer_to_clbits[stab][0]+ c * self.n_stabilizers
                 x_syndromes[c, i] = int(bits[clbits]) 
             
@@ -370,35 +367,40 @@ class RotatedSurfaceCode:
         mid_counts = res["mid_counts"]
         statevector_readout = res["statevector_readout"]
 
-        # --- Process mid_counts to separate registers ---
-        register_size= [self.n_data]+ [self.n_stabilizers]*self.cycles 
-        
-        processed_counts = self._split_counts(mid_counts, register_size)
-        
+        print("Mid-circuit counts before decoding:\n", mid_counts)
         for bitstring, count in mid_counts.items():
-
-            bitstring = bitstring.strip()
+            print("\n--- Decoding bitstring:", bitstring, "---")
             syndrome_bits = bitstring[self.n_data:]
+            data_bits = bitstring[:self.n_data]
             predictions_x, predictions_z = self.decode_full(syndrome_bits)
+            print("Predictions X:\n", predictions_x)
+            print("Predictions Z:\n", predictions_z)
             final_x_correction = np.bitwise_xor.reduce(predictions_x, axis=0)
             final_z_correction = np.bitwise_xor.reduce(predictions_z, axis=0)
 
             
             print("Syndrome bits:", syndrome_bits)
-            print("Final X corrections:", final_x_correction)
-            print("Final Z corrections:", final_z_correction)
-
-            for i in range(len(predictions_x)): 
-                print( 
-                        f"X prediction {final_x_correction[i]}, "
-                        f"Z prediction {final_z_correction[i]}"
-                    )
+            print("Final X corrections (indicating a Z-error):", final_x_correction)
+            print("Final Z corrections (indicating a X-error):", final_z_correction)
+            original_data_bits = data_bits  # Save original for key update
+            corrected_counts = {}
+            for i in range(len(final_x_correction)): 
                 
-                if final_x_correction[i] == 1:
+                if final_z_correction[i] == 1:
                     new_bit = '1' if data_bits[i] == '0' else '0'
                     data_bits = data_bits[:i] + new_bit + data_bits[i+1:]
+            print("Corrected data bits:", data_bits)
+            # Create new key with corrected data
+            new_key = data_bits +syndrome_bits
+            corrected_counts[new_key] = mid_counts.get(new_key, 0) + count
 
+            print("Updated mid_counts:", mid_counts)
+            
+        # --- Process mid_counts to separate registers ---
+        register_size= [self.n_data]+ [self.n_stabilizers]*self.cycles 
         
+        processed_counts = self._split_counts(corrected_counts, register_size)
+        print("Processed counts after splitting registers:\n", processed_counts)
         return processed_counts, t_circ
 
     def _split_counts(self, raw_counts: dict, register_sizes: list) -> dict:
@@ -577,8 +579,7 @@ class RotatedSurfaceCode:
             for dq in data_qubits:
                 data_idx = self.data_qubits.index(dq)
                 H[i, data_idx] = 1
-        
-        print(H.toarray())
+        print(f"Parity-check matrix H_{stabilizer_type}:\n", H.toarray())
         return H.tocsr()
     
     def setup_decoder(self):
@@ -593,7 +594,7 @@ class RotatedSurfaceCode:
     def _decode_per_cycle(self, syndrome1, syndrome2, which='X'):
         # Bitwise XOR between consecutive cycles
         syndrome = np.bitwise_xor(syndrome1, syndrome2).astype(np.uint8).flatten()
-
+        print("Syndrome for decoding :\n", which, syndrome)
         # Choose which stabilizer matrix to use
         if which == 'X':
             H = self.H_X
@@ -603,7 +604,7 @@ class RotatedSurfaceCode:
             raise ValueError("which must be 'X' or 'Z'")
 
         matching = pymatching.Matching(H)
-    
+
         # Sanity check
         assert syndrome.shape[0] == H.shape[0], \
             f"Syndrome length {syndrome.shape[0]} != {H.shape[0]} stabilizers"
@@ -620,8 +621,6 @@ class RotatedSurfaceCode:
             bitstring = list(bitstring.keys())[0]
         
         x_syndromes, z_syndromes = self._extract_stabilizer_measurements(bitstring)
-        print("Extracted X syndromes:\n", x_syndromes)
-        print("Extracted Z syndromes:\n", z_syndromes)
         n_cycles = self.cycles
 
         prediction_x = []
