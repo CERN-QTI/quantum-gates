@@ -54,21 +54,17 @@ class RotatedSurfaceCode:
         self.stabilizer_to_clbits = {
             stab: [i] for i, stab in enumerate(sorted_stabilizers)
         }
-
-        print("Stabilizers:", self.stabilizers)
-        print("Data qubits:", self.data_qubits)
-        print("X stabilizers:", self.x_stabilizers)
-        print("Z stabilizers:", self.z_stabilizers)
-        print("n_qubits =", self.n_qubits)
-
-
         self._build_stabilizer_layer()
         # Compute stabilizer connections BEFORE setting up decoder
         self.stabilizer_to_dqubits = self._compute_stabilizer_connections()
     
         # Now setup the decoder (needs x_stabilizers, z_stabilizers, and stabilizer_connections)
         self.setup_decoder()
-        
+
+# ========================================================================
+#  LAYOUT METHODS
+#  ========================================================================  
+
     def _get_surface_code_layout(self):
         """
         Construct the rotated surface code layout following user rules:
@@ -171,9 +167,6 @@ class RotatedSurfaceCode:
         return data, stab_x, stab_z, neighbors
 
 
-    
-    
-
     def _build_stabilizer_layer(self):
         """Build one stabilizer measurement cycle for a distance-n surface code."""
 
@@ -226,6 +219,72 @@ class RotatedSurfaceCode:
         self.qc.x(range(0,self.n_qubits))  # introduce bit-flip errors on all data qubits
         self.qc.barrier()
 
+# ========================================================================
+#  RUN METHOD
+#  ========================================================================
+
+    def run_surfacecode(self, noise, shots = 1, initial_state = None):
+        """Run the surface code circuit on the specified backend with noise model."""
+        backend = FakeBrisbane()
+        
+        if noise:
+            set_gate = standard_gates
+            bit_flip_bool = True
+        else:
+            set_gate = NoiseFreeGates
+            bit_flip_bool = False
+
+        sim = MrAndersonSimulator(gates=set_gate, CircuitClass=EfficientCircuit)
+        
+
+        needs_controlflow = any(isinstance(op.operation, ControlFlowOp) for op in self.qc.data)
+
+        cm = CouplingMap([(i, i+1) for i in range(self.n_qubits - 1)])
+
+        t_circ = transpile(
+            self.qc,
+            backend = None,
+            basis_gates=['ecr', 'rz', 'sx','x'],
+            coupling_map=cm,
+            initial_layout=list(range(self.n_qubits)),
+            seed_transpiler=42,
+            scheduling_method=needs_controlflow,      
+
+        )
+        if initial_state is None:
+            initial_state = np.zeros(2**self.n_qubits)
+            initial_state[0] = 1.0  # set |00...0⟩
+
+        device_param_lookup = self._get_device_parameters(backend)
+        
+        res  = sim.run( 
+            t_qiskit_circ=t_circ,  
+            psi0=initial_state, 
+            shots=shots, 
+            device_param=device_param_lookup,
+            nqubit=self.n_qubits,
+            bit_flip_bool=bit_flip_bool,
+            )
+
+        probs = res["probs"]
+        results = res["results"]
+        num_clbits = res["num_clbits"]
+        mid_counts = res["mid_counts"]
+        statevector_readout = res["statevector_readout"]
+        
+        print("Mid-circuit counts before decoding:\n", mid_counts)
+        
+        corrected_counts, data_counts, predictions_x, predictions_z = self.decode_correct_counts(mid_counts)
+
+        # --- Process mid_counts to separate registers ---
+        register_size= [self.n_data]+ [self.n_stabilizers]*self.cycles 
+        
+        processed_counts = self._split_counts(corrected_counts, register_size)
+        return processed_counts, data_counts, t_circ, statevector_readout, predictions_x, predictions_z
+
+# ========================================================================
+#  HELPER METHODS
+#  ========================================================================
 
     def _compute_stabilizer_connections(self):
         """
@@ -262,147 +321,6 @@ class RotatedSurfaceCode:
         
         return x_syndromes, z_syndromes
 
-
-    def run_surfacecode(self, noise, shots = 1):
-        """Run the surface code circuit on the specified backend with noise model."""
-        backend = FakeBrisbane()
-        
-        if noise:
-            set_gate = standard_gates
-            bit_flip_bool = True
-        else:
-            set_gate = NoiseFreeGates
-            bit_flip_bool = False
-
-        sim = MrAndersonSimulator(gates=set_gate, CircuitClass=EfficientCircuit)
-        
-
-        needs_controlflow = any(isinstance(op.operation, ControlFlowOp) for op in self.qc.data)
-        
-        # Get backend's coupling map edges
-        backend_coupling = backend.coupling_map
-
-        cm = CouplingMap([(i, i+1) for i in range(self.n_qubits - 1)])
-
-        t_circ = transpile(
-            self.qc,
-            backend = None,
-            basis_gates=['ecr', 'rz', 'sx','x'],
-            coupling_map=cm,
-            initial_layout=list(range(self.n_qubits)),
-            seed_transpiler=42,
-            scheduling_method=needs_controlflow,      
-
-        )
-
-
-        # Check which qubits are actually used in transpiled circuit
-        used_qubits: list[int] = []
-        for instr in t_circ.data:
-            op = instr.operation
-            if op.name == 'delay' or op.name == 'barrier':
-                continue
-            # support any arity
-            for qb in instr.qubits:
-                q = qb._index
-                if q not in used_qubits:
-                    used_qubits.append(q)
-                    
-        print(f"Qubits used in transpiled circuit: {sorted(used_qubits)}")
-
-        max_qubit = max(used_qubits)
-        nqubit_actual = max_qubit + 1
-
-        initial_psi = np.zeros(2**nqubit_actual)
-        initial_psi[0] = 1.0  # set |00...0⟩
-
-        device_param = DeviceParameters(list(range(nqubit_actual)))
-        device_param.load_from_backend(backend)
-        device_param_lookup = device_param.__dict__()
-        # The standard t_int value for allowed ECR gates
-        t_int_value = 6.6e-07
-        #Add t_int values for all consecutive qubit pairs
-        # Get average p_int
-        non_zero_p_int =  device_param_lookup['p_int'][ device_param_lookup['p_int'] != 0]
-        avg_p_int = np.mean(non_zero_p_int) if len(non_zero_p_int) > 0 else 0.01
-
-        for i in range(self.n_qubits - 1):
-            # Add both directions for the ECR gate
-            device_param_lookup['t_int'][i, i+1] = t_int_value
-            device_param_lookup['t_int'][i+1, i] = t_int_value
-
-            if device_param_lookup['p_int'][i, i+1] == 0:
-                # Look for nearest existing edge with p_int value
-                found_p_int = None
-                
-                # Check adjacent qubits first
-                for offset in [1, 2, 3]:
-                    if i - offset >= 0 and device_param_lookup['p_int'][i-offset, i-offset+1] != 0:
-                        found_p_int = device_param_lookup['p_int'][i-offset, i-offset+1]
-                        break
-                    if i + offset < self.n_qubits - 1 and device_param_lookup['p_int'][i+offset, i+offset+1] != 0:
-                        found_p_int = device_param_lookup['p_int'][i+offset, i+offset+1]
-                        break
-                
-                # Fall back to average if no nearby edge found
-                if found_p_int is None:
-                    print("Warning: No nearby p_int found")
-                    found_p_int = avg_p_int
-                
-                device_param_lookup['p_int'][i, i+1] = found_p_int
-                device_param_lookup['p_int'][i+1, i] = found_p_int
-
-        res  = sim.run( 
-            t_qiskit_circ=t_circ,  
-            psi0=initial_psi, 
-            shots=shots, 
-            device_param=device_param_lookup,
-            nqubit=nqubit_actual,
-            bit_flip_bool=bit_flip_bool,
-            )
-
-        probs = res["probs"]
-        results = res["results"]
-        num_clbits = res["num_clbits"]
-        mid_counts = res["mid_counts"]
-        statevector_readout = res["statevector_readout"]
-
-        print("Mid-circuit counts before decoding:\n", mid_counts)
-        for bitstring, count in mid_counts.items():
-            print("\n--- Decoding bitstring:", bitstring, "---")
-            syndrome_bits = bitstring[self.n_data:]
-            data_bits = bitstring[:self.n_data]
-            predictions_x, predictions_z = self.decode_full(syndrome_bits)
-            print("Predictions X:\n", predictions_x)
-            print("Predictions Z:\n", predictions_z)
-            final_x_correction = np.bitwise_xor.reduce(predictions_x, axis=0)
-            final_z_correction = np.bitwise_xor.reduce(predictions_z, axis=0)
-
-            
-            print("Syndrome bits:", syndrome_bits)
-            print("Final X corrections (indicating a Z-error):", final_x_correction)
-            print("Final Z corrections (indicating a X-error):", final_z_correction)
-            original_data_bits = data_bits  # Save original for key update
-            corrected_counts = {}
-            for i in range(len(final_x_correction)): 
-                
-                if final_z_correction[i] == 1:
-                    new_bit = '1' if data_bits[i] == '0' else '0'
-                    data_bits = data_bits[:i] + new_bit + data_bits[i+1:]
-            print("Corrected data bits:", data_bits)
-            # Create new key with corrected data
-            new_key = data_bits +syndrome_bits
-            corrected_counts[new_key] = mid_counts.get(new_key, 0) + count
-
-            print("Updated mid_counts:", mid_counts)
-            
-        # --- Process mid_counts to separate registers ---
-        register_size= [self.n_data]+ [self.n_stabilizers]*self.cycles 
-        
-        processed_counts = self._split_counts(corrected_counts, register_size)
-        print("Processed counts after splitting registers:\n", processed_counts)
-        return processed_counts, t_circ
-
     def _split_counts(self, raw_counts: dict, register_sizes: list) -> dict:
         """
         Splits the concatenated bitstrings in the dictionary keys based on a list of register sizes.
@@ -438,6 +356,43 @@ class RotatedSurfaceCode:
             
         return processed_counts
 
+    def _get_device_parameters(self, backend):
+        device_param = DeviceParameters(list(range(self.n_qubits)))
+        device_param.load_from_backend(backend)
+        device_param_lookup = device_param.__dict__()
+        # The standard t_int value for allowed ECR gates
+        t_int_value = 6.6e-07
+        #Add t_int values for all consecutive qubit pairs
+        # Get average p_int
+        non_zero_p_int =  device_param_lookup['p_int'][ device_param_lookup['p_int'] != 0]
+        avg_p_int = np.mean(non_zero_p_int) if len(non_zero_p_int) > 0 else 0.01
+
+        for i in range(self.n_qubits - 1):
+            # Add both directions for the ECR gate
+            device_param_lookup['t_int'][i, i+1] = t_int_value
+            device_param_lookup['t_int'][i+1, i] = t_int_value
+
+            if device_param_lookup['p_int'][i, i+1] == 0:
+                # Look for nearest existing edge with p_int value
+                found_p_int = None
+                
+                # Check adjacent qubits first
+                for offset in [1, 2, 3]:
+                    if i - offset >= 0 and device_param_lookup['p_int'][i-offset, i-offset+1] != 0:
+                        found_p_int = device_param_lookup['p_int'][i-offset, i-offset+1]
+                        break
+                    if i + offset < self.n_qubits - 1 and device_param_lookup['p_int'][i+offset, i+offset+1] != 0:
+                        found_p_int = device_param_lookup['p_int'][i+offset, i+offset+1]
+                        break
+                
+                # Fall back to average if no nearby edge found
+                if found_p_int is None:
+                    print("Warning: No nearby p_int found")
+                    found_p_int = avg_p_int
+                
+                device_param_lookup['p_int'][i, i+1] = found_p_int
+                device_param_lookup['p_int'][i+1, i] = found_p_int
+        return device_param_lookup  
 
 # ========================================================================
 #  PLOTTING METHODS
@@ -579,7 +534,6 @@ class RotatedSurfaceCode:
             for dq in data_qubits:
                 data_idx = self.data_qubits.index(dq)
                 H[i, data_idx] = 1
-        print(f"Parity-check matrix H_{stabilizer_type}:\n", H.toarray())
         return H.tocsr()
     
     def setup_decoder(self):
@@ -588,7 +542,6 @@ class RotatedSurfaceCode:
         """
         self.H_X = self._build_parity_check_matrix('X')
         self.H_Z = self._build_parity_check_matrix('Z')
-        print("Decoder setup complete.")
 
  
     def _decode_per_cycle(self, syndrome1, syndrome2, which='X'):
@@ -638,4 +591,34 @@ class RotatedSurfaceCode:
             prediction_z.append(prediction_z_cycle)
 
         return np.array(prediction_x), np.array(prediction_z)
-        
+    
+    def decode_correct_counts(self, mid_counts):
+        corrected_counts = {}
+        data_counts = {}
+        for bitstring, count in mid_counts.items():
+            print("\n--- Decoding bitstring:", bitstring, "---")
+            syndrome_bits = bitstring[self.n_data:]
+            data_bits = bitstring[:self.n_data]
+            predictions_x, predictions_z = self.decode_full(syndrome_bits)
+            print("Predictions X:\n", predictions_x)
+            print("Predictions Z:\n", predictions_z)
+            final_x_correction = np.bitwise_xor.reduce(predictions_x, axis=0)
+            final_z_correction = np.bitwise_xor.reduce(predictions_z, axis=0)
+
+            
+            print("Syndrome bits:", syndrome_bits)
+            print("Final X corrections (indicating a Z-error):", final_x_correction)
+            print("Final Z corrections (indicating a X-error):", final_z_correction)
+            
+            for i in range(len(final_x_correction)): 
+                
+                if final_z_correction[i] == 1:
+                    new_bit = '1' if data_bits[i] == '0' else '0'
+                    data_bits = data_bits[:i] + new_bit + data_bits[i+1:]
+            print("Corrected data bits:", data_bits)
+            # Create new key with corrected data
+            new_key = data_bits +syndrome_bits
+            corrected_counts[new_key] = corrected_counts.get(new_key, 0) + count
+            data_counts[data_bits] = data_counts.get(data_bits, 0) + count
+            print("Updated mid_counts:", corrected_counts) 
+        return corrected_counts, data_counts, predictions_x, predictions_z
