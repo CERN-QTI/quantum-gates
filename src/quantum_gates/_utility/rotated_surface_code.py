@@ -210,7 +210,10 @@ class RotatedSurfaceCode:
                 anc = stabilizer[1]
                 self.qc.measure(anc, self.cycle_cregs[cycle][i])
 
-            self.qc.barrier(label="save_statevector")
+            #self.qc.save_statevector(label=f"save_sv_{cycle}")
+            self.qc.barrier(label=f"save_sv_{cycle}") # replave with save_statevector with barrier
+            
+            
         # --- Final measurement of data qubits in Z basis ---
         for i, data_qubit in enumerate(self.data_qubits):
             self.qc.measure(data_qubit, self.c_data[i])
@@ -270,7 +273,7 @@ class RotatedSurfaceCode:
         results = res["results"]
         num_clbits = res["num_clbits"]
         mid_counts = res["mid_counts"]
-        statevector_readout = res["statevector_readout"]
+        barrier_statevectors = res["barrier_statevectors"]
         
         print("Mid-circuit counts before decoding:\n", mid_counts)
         
@@ -280,7 +283,7 @@ class RotatedSurfaceCode:
         register_size= [self.n_data]+ [self.n_stabilizers]*self.cycles 
         
         processed_counts = self._split_counts(corrected_counts, register_size)
-        return processed_counts, data_counts, t_circ, statevector_readout, predictions_x, predictions_z
+        return processed_counts, data_counts, t_circ, barrier_statevectors, predictions_x, predictions_z
 
 # ========================================================================
 #  HELPER METHODS
