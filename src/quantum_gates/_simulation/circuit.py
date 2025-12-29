@@ -650,13 +650,27 @@ class AlternativeCircuit(object):
             
         else:
             result = outcomes_in_q_order
+        
 
         return psi, result
 
     
     def statevector_readout(self, psi0) -> np.array:
-        return psi0
+        
+        psi = psi0.copy()
     
+        dim = len(psi)
+        n = int(np.log2(dim))
+
+        for qubit in range(n):
+            if self.phi[qubit] != 0:
+                phase = self.phi[qubit]
+                for idx in range(dim):
+                    bit = (idx >> (n - 1 - qubit)) & 1
+                    if bit == 1:
+                        psi[idx] *= np.exp(1j * phase)
+        
+        return psi
     
     def I(self, i: int):
         """Apply identity gate on qubit i

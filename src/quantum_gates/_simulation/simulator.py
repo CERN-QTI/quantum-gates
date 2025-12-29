@@ -732,8 +732,10 @@ def _single_shot(args: dict) -> np.array:
             elif d.operation.name == "barrier":
                 # handle save_statevector with barrier label
                 if d.label is not None and 'save' in d.label:
+                    psi_copy = psi.copy()
+                    psi_copy = circ.statevector_readout(psi_copy)
                     # save current statevector
-                    barrier_statevectors.append((d.label, psi.copy()))
+                    barrier_statevectors.append((d.label, psi_copy))
             
             else:
                 op_name = d.operation.name

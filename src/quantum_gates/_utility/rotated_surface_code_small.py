@@ -15,27 +15,19 @@ from qiskit.circuit.controlflow import ControlFlowOp
 from qiskit.transpiler import CouplingMap
 from qiskit_ibm_runtime.fake_provider import FakeBrisbane
 
-from qiskit_aer import AerSimulator
-from qiskit_aer.noise import NoiseModel, depolarizing_error
-from qiskit_aer.noise import pauli_error
 
-
-class RotatedSurfaceCode:
-    def __init__(self, distance=3, cycles = 1, aer = False, transpile = True, error = None):
+class RotatedSurfaceCode_Small:
+    def __init__(self, distance=1, cycles = 1, aer=False, error=None):
         self.d = distance
-        self.n_rows = 2 * distance + 1
+        self.n_rows = 2
         self.cycles = cycles
-        self.n_data = distance**2 
-        self.n_stabilizers = distance**2 - 1 
+        self.n_data = 2 
+        self.n_stabilizers = 2
         self.n_qubits = self.n_data + self.n_stabilizers
+        self.initial_state = None
         self.aer = aer
-        self.transpile = transpile
-        self.error = error  # tuple (cycle, qubit_index, error_type)
+        self.error = error
 
-        self.initial_state = np.zeros(2**self.n_qubits, dtype=complex)
-        indices = [np.int64(0), np.int64(9), np.int64(54), np.int64(63), np.int64(209), np.int64(216), np.int64(231), np.int64(238), np.int64(278), np.int64(287), np.int64(288), np.int64(297), np.int64(455), np.int64(462), np.int64(497), np.int64(504)]
-        for indices in indices:
-            self.initial_state[indices] = 1 / np.sqrt(16)
         # Quantum register
         self.q_register = QuantumRegister(self.n_qubits, 'q')
 
@@ -53,9 +45,10 @@ class RotatedSurfaceCode:
 
         # define data and stabilizer indices based on even/odd parity
 
-        data_qubits, self.x_stabilizers, self.z_stabilizers,  self.neighbors = self._get_surface_code_layout()
+        self.x_stabilizers = [(0,0)]
+        self.z_stabilizers = [(1,3)]
         self.stabilizers = self.x_stabilizers + self.z_stabilizers
-        self.data_qubits = [global_idx for (row, global_idx) in data_qubits]
+        self.data_qubits = [1,2]
 
 
         # Sort stabilizers by global_index (second element of tuple)
@@ -67,171 +60,67 @@ class RotatedSurfaceCode:
         }
         self._build_stabilizer_layer()
         # Compute stabilizer connections BEFORE setting up decoder
-        self.stabilizer_to_dqubits = self._compute_stabilizer_connections()
-    
+        self.stabilizer_to_dqubits = {(0,0): [1,2], (1,3): [1,2]}
+
         # Now setup the decoder (needs x_stabilizers, z_stabilizers, and stabilizer_connections)
         self.setup_decoder()
+    
 
 # ========================================================================
 #  LAYOUT METHODS
 #  ========================================================================  
 
-    def _get_surface_code_layout(self):
-        """
-        Construct the rotated surface code layout following user rules:
-
-        Row structure:
-        - Row 0: floor(d/2) Z stabilizers, then d Z stabilizers, then floor(d/2) Z stabilizers
-        - Rows 1,3,... : d data qubits centered
-        - Rows 2,4,... : d alternating X/Z stabilizers centered, starting with X
-        - Last row (2d-2): same as row 0
-        """
-
-        d = self.d
-        n_rows = self.n_rows
-        half = d // 2
-
-        data = []
-        stab_x = []
-        stab_z = []
-        neighbors = {} 
-
-        index = 0  # simple linear indexing
-
-        for r in range(n_rows):
-
-            # ---- Row 0 (top) and last row: Z boundary stabilizers ----
-            if r == 0 or r == n_rows-1:
-                if r == 0: factor = +1 * math.ceil(d/2)
-                else: factor = -1 * d
-                index_neighbor = 0
-                for k in range(half):
-                    stab_z.append((r, index)); 
-                    neighbor = []
-                    neighbor.append(index + factor  + index_neighbor )
-                    neighbor.append(index + factor + 1  + index_neighbor )
-                    neighbors[index] = neighbor
-                    index_neighbor += 1
-                    index += 1
-                
-                continue
-
-            # ---- Data row (odd rows) ----
-            if r % 2 == 1:
-                for _ in range(d):
-                    data.append((r, index))
-                    index += 1
-                continue
-
-            # ---- Stabilizer row (even rows except boundary) ----
-            if r % 2 == 0:
-                # Alternating X/Z, starting with X
-                for k in range(d):
-                    if k % 2 == 0 :
-                        stab_x.append((r, index))
-                        if r %4 == 2:
-                            if k == 0:
-                                neighbor = []
-                                neighbor.append(index - d)
-                                neighbor.append(index + d)
-                                neighbors[index] = neighbor
-                            else:
-                                neighbor = []
-                                neighbor.append(index - d -1)
-                                neighbor.append(index - d )
-                                neighbor.append(index + d -1)
-                                neighbor.append(index + d )
-                                neighbors[index] = neighbor
-
-                        else: 
-                            if k == d -1:
-                                neighbor = []
-                                neighbor.append(index - d)
-                                neighbor.append(index + d)
-                                neighbors[index] = neighbor
-                            else:
-                                neighbor = []
-                                neighbor.append(index - d )
-                                neighbor.append(index - d +1)
-                                neighbor.append(index + d )
-                                neighbor.append(index + d +1)
-                                neighbors[index] = neighbor
-                    else:
-                        stab_z.append((r, index))
-                        if r % 4 == 2:
-                            neighbor = []
-                            neighbor.append(index - d -1)
-                            neighbor.append(index - d )
-                            neighbor.append(index + d -1)
-                            neighbor.append(index + d )
-                            neighbors[index] = neighbor
-                        else: 
-                            neighbor = []
-                            neighbor.append(index - d)
-                            neighbor.append(index - d +1)
-                            neighbor.append(index + d)
-                            neighbor.append(index + d +1)
-                            neighbors[index] = neighbor
-                    index += 1
-                continue
-
-        return data, stab_x, stab_z, neighbors
-
+    
 
     def _build_stabilizer_layer(self):
         """Build one stabilizer measurement cycle for a distance-n surface code."""
-        # repeat the stabilizer-measurement process for all cycles
-        if self.aer and not self.transpile:
-                self.qc.set_statevector(self.initial_state)
-    
-        for cycle in range(self.cycles):
-            # --- Reset all stabilizers at the beginning of the cycle ---
-            for stabilizer in self.x_stabilizers + self.z_stabilizers:
-                anc = stabilizer[1]
-                self.qc.reset(anc)
+        if self.aer:
+                alpha = 1 / math.sqrt(2)
+                initial_state = np.zeros(2**self.n_qubits)
+                initial_state[0] = alpha  
+                initial_state[6] = alpha 
+                self.qc.set_statevector(initial_state)
+        for i in range(self.cycles):
+            
+            
+            self.qc.reset(0)  # Reset q0
+            self.qc.reset(3)  # Reset q3
+            self.qc.barrier()
+            self.qc.h(0)
+            self.qc.id(1)
+            self.qc.id(2)
+            self.qc.id(3)
+            self.qc.barrier()
+            
+            # Apply CNOT gates as per the circuit diagram
+            self.qc.cx(0, 1)  # CNOT from qubit 0 to qubit 1
+            self.qc.cx(0, 2)  # CNOT from qubit 0 to qubit 2
+            c,j,e = self.error
+            if i == c :
+                if e == 'X':
+                    self.qc.x(j)
+                elif e == 'Y':
+                    self.qc.y(j)
+                elif e == 'Z':
+                    self.qc.z(j)
+            self.qc.cx(1, 3)  # CNOT from qubit 2 to qubit 1
+            self.qc.cx(2, 3)  # CNOT from qubit 2 to qubit 3
+            self.qc.barrier()
+            
+
+            # Apply Hadamard gate on qubit 0 before measurement in the X basis
+            self.qc.h(0)
+            self.qc.id(1)
+            self.qc.id(2)
+            self.qc.id(3)
+
+            # Measure qubits in the X and Z bases
+            self.qc.measure(0, self.cycle_cregs[i][0])  # X_a measurement
+            self.qc.measure(3, self.cycle_cregs[i][1])  # X_a measurement
             if self.aer:
-                for data_qubit in self.data_qubits:
-                    self.qc.id(data_qubit)  # identity on data qubits to avoid optimization
-                    
-            # --- X stabilizers ---
-            for stabilizer in self.x_stabilizers:
-                anc = stabilizer[1]
-                self.qc.h(anc)  # prepare X stabilizer in |+>
-                
-                self.qc.barrier()
-
-                # entangle with data qubits (ancilla is control)
-                neighbor = self.neighbors[anc]
-                for nb in neighbor:
-                    self.qc.cx(anc, nb)
-
-                self.qc.barrier()
-                self.qc.h(anc)  # rotate back before measurement
-
-            # --- Z stabilizers ---
-            for stabilizer in self.z_stabilizers:
-                anc = stabilizer[1]
-                # entangle with data qubits (data is control, ancilla target)
-                neighbor = self.neighbors[anc]
-                for nb in neighbor:
-                    self.qc.cx(nb, anc)
-
-                self.qc.barrier()
-            
-            #conditional gate on the mid-circuit measurement results to run the decoder and determine the basis for the end measrement.
-
-            # --- Measure all stabilizers for this cycle --- 
-            
-            stab_list = sorted(self.x_stabilizers + self.z_stabilizers)
-            for i, stabilizer in enumerate(stab_list):
-                anc = stabilizer[1]
-                self.qc.measure(anc, self.cycle_cregs[cycle][i])
-
-            
-            if self.aer and not self.transpile:
-                self.qc.save_statevector(label=f"save_sv_{cycle}")
+                self.qc.save_statevector(label=f"save_sv_{i}")
             else:
-                self.qc.barrier(label=f"save_sv_{cycle}")
+                self.qc.barrier(label=f"save_sv_{i}") #
             
         # --- Final measurement of data qubits in Z basis ---
         for i, data_qubit in enumerate(self.data_qubits):
@@ -245,7 +134,9 @@ class RotatedSurfaceCode:
 #  RUN METHOD
 #  ========================================================================
 
-    def run_surfacecode(self, noise, shots = 1):
+    def run_surfacecode(self, noise, shots = 1, initial_state = None):
+        self.initial_state = initial_state
+        
         """Run the surface code circuit on the specified backend with noise model."""
         backend = FakeBrisbane()
         
@@ -262,125 +153,53 @@ class RotatedSurfaceCode:
         needs_controlflow = any(isinstance(op.operation, ControlFlowOp) for op in self.qc.data)
 
         cm = CouplingMap([(i, i+1) for i in range(self.n_qubits - 1)])
-
+    
         t_circ = transpile(
             self.qc,
-            None,
+            backend = None,
             basis_gates=['ecr', 'rz', 'sx','x'],
             coupling_map=cm,
             initial_layout=list(range(self.n_qubits)),
             seed_transpiler=42,
-            scheduling_method=needs_controlflow,
+            scheduling_method=needs_controlflow,      
+
         )
+        if initial_state is None:
+            #alpha = 1 / math.sqrt(2)
+            initial_state = np.zeros(2**self.n_qubits)
+            initial_state[0] = 1 
+            #initial_state[6] = alpha 
 
-        if self.aer:
-            if noise:
-                # Create a simple noise model
-                noise_model = NoiseModel()
+        device_param_lookup = self._get_device_parameters(backend)
+        
+        res  = sim.run( 
+            t_qiskit_circ=t_circ,  
+            psi0=initial_state, 
+            shots=shots, 
+            device_param=device_param_lookup,
+            nqubit=self.n_qubits,
+            bit_flip_bool=bit_flip_bool,
+            )
 
-                # Add depolarizing error to all single-qubit gates
-                p_1q = 0.001  # 0.1% error rate
-                depol_1q = depolarizing_error(p_1q, 1)
-                noise_model.add_all_qubit_quantum_error(depol_1q, ['u1', 'u2', 'u3', 'h', 'x', 'y', 'z', 's', 't'])
-
-                # Add depolarizing error to all two-qubit gates
-                p_2q = 0.01  # 1% error rate
-                depol_2q = depolarizing_error(p_2q, 2)
-                noise_model.add_all_qubit_quantum_error(depol_2q, ['cx', 'cz', 'swap'])
-
-                # Measurement error
-                p_meas = 0.01  # 1% measurement error
-
-                meas_error = pauli_error([('X', p_meas), ('I', 1 - p_meas)])
-                noise_model.add_all_qubit_quantum_error(meas_error, ['measure'])
-                sim = AerSimulator(noise_model=noise_model)
-            else: 
-                sim = AerSimulator()
-            new_circ = self.aer_circuit(t_circ, self.initial_state)
-            result = sim.run(new_circ, shots=shots).result()
-            mid_counts = {k.replace(' ', ''): v for k, v in result.get_counts().items()}
-
-
-            # Extract statevectors in the same format as barrier_statevectors
-            Aer_svs = []
-
-            # Get all save_sv labels in order
-            sv_labels = sorted([label for label in result.data().keys() if label.startswith('save_sv_')],
-                            key=lambda x: int(x.split('_')[-1]))
-
-            for label in sv_labels:
-                sv_array = result.data()[label].data  # Extract numpy array from Statevector
-                Aer_svs.append((label, sv_array))
-            barrier_statevectors = Aer_svs
-            t_circ = new_circ
-
-            
-        else:
-            device_param_lookup = self._get_device_parameters(backend)
-            
-            res  = sim.run( 
-                t_qiskit_circ=t_circ,  
-                psi0=self.initial_state, 
-                shots=shots, 
-                device_param=device_param_lookup,
-                nqubit=self.n_qubits,
-                bit_flip_bool=bit_flip_bool,
-                )
-
-            probs = res["probs"]
-            results = res["results"]
-            num_clbits = res["num_clbits"]
-            mid_counts = res["mid_counts"]
-            barrier_statevectors = res["barrier_statevectors"]
-            
-            print("Mid-circuit counts before decoding:\n", mid_counts)
-            
-        corrected_counts, data_counts, predictions_x, predictions_z = self.decode_correct_counts(mid_counts)
-
+        probs = res["probs"]
+        results = res["results"]
+        num_clbits = res["num_clbits"]
+        mid_counts = res["mid_counts"]
+        barrier_statevectors = res["barrier_statevectors"]
+        
+        print("Mid-circuit counts before decoding:\n", mid_counts)
+        
+        
         # --- Process mid_counts to separate registers ---
         register_size= [self.n_data]+ [self.n_stabilizers]*self.cycles 
         
-        processed_counts = self._split_counts(corrected_counts, register_size)
-        return processed_counts, data_counts, t_circ, barrier_statevectors, predictions_x, predictions_z
-    
-    def aer_circuit(self, t_circ, initial_state):
-        """Return the transpiled circuit for AER simulation."""
-        # Create new circuit with same registers as original
-        new_circ = QuantumCircuit(*t_circ.qregs, *t_circ.cregs)
-        new_circ.initialize(initial_state, range(self.n_qubits))
-        for instruction, qargs, cargs in t_circ.data:
-            if instruction.name == 'barrier':
-                # Check if it has a label starting with 'save_sv_'
-                if hasattr(instruction, 'label') and instruction.label and instruction.label.startswith('save_sv_'):
-                    # Replace with save_statevector (no qargs/cargs needed)
-                    new_circ.save_statevector(label=instruction.label)
-                else:
-                    # Keep other barriers as-is
-                    new_circ.append(instruction, qargs, cargs)
-            else:
-                # Copy all other instructions normally
-                new_circ.append(instruction, qargs, cargs)
-        return new_circ
-
+        processed_counts = self._split_counts(mid_counts, register_size)
+        return processed_counts, t_circ, barrier_statevectors
 
 # ========================================================================
 #  HELPER METHODS
 #  ========================================================================
 
-    def _compute_stabilizer_connections(self):
-        """
-        Compute which data qubits each stabilizer measures.
-        Returns dict: stabilizer_index -> list of data qubit indices
-        """
-        connections = {}
-        
-        for stab in self.x_stabilizers + self.z_stabilizers:
-            anc = stab[1]
-                # entangle with data qubits (data is control, ancilla target)
-            neighbors = self.neighbors[anc]
-            connections[stab] = neighbors
-        return connections
-    
 
     def _extract_stabilizer_measurements(self, bitstring):
         """
@@ -623,12 +442,12 @@ class RotatedSurfaceCode:
         """
         self.H_X = self._build_parity_check_matrix('X')
         self.H_Z = self._build_parity_check_matrix('Z')
+        
 
  
     def _decode_per_cycle(self, syndrome1, syndrome2, which='X'):
         # Bitwise XOR between consecutive cycles
         syndrome = np.bitwise_xor(syndrome1, syndrome2).astype(np.uint8).flatten()
-        print("Syndrome for decoding :\n", which, syndrome)
         # Choose which stabilizer matrix to use
         if which == 'X':
             H = self.H_X
@@ -681,15 +500,11 @@ class RotatedSurfaceCode:
             syndrome_bits = bitstring[self.n_data:]
             data_bits = bitstring[:self.n_data]
             predictions_x, predictions_z = self.decode_full(syndrome_bits)
-            print("Predictions X:\n", predictions_x)
-            print("Predictions Z:\n", predictions_z)
             final_x_correction = np.bitwise_xor.reduce(predictions_x, axis=0)
             final_z_correction = np.bitwise_xor.reduce(predictions_z, axis=0)
 
             
             print("Syndrome bits:", syndrome_bits)
-            print("Final X corrections (indicating a Z-error):", final_x_correction)
-            print("Final Z corrections (indicating a X-error):", final_z_correction)
             
             for i in range(len(final_x_correction)): 
                 
