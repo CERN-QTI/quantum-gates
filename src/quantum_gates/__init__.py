@@ -1,4 +1,4 @@
-from .gates import Gates, NoiseFreeGates, ScaledNoiseGates, CustomNoiseGates
+from .gates import Gates, NoiseFreeGates, ScaledNoiseGates, CustomNoiseGates, CustomNoiseChannelsGates
 from .gates import standard_gates, noise_free_gates, legacy_gates
 from .simulators import MrAndersonSimulator, LegacyMrAndersonSimulator
 from .backends import EfficientBackend, LegacyBackend
@@ -23,7 +23,7 @@ from .pulses import constant_pulse, constant_pulse_numerical, gaussian_pulse
 from .qiskit_provider import NoisyGatesBackend, NoisyGatesJob, NoisyGatesProvider
 
 
-__all__ = ["Gates", "NoiseFreeGates", "ScaledNoiseGates", "CustomNoiseGates"]
+__all__ = ["Gates", "NoiseFreeGates", "ScaledNoiseGates", "CustomNoiseGates", "CustomNoiseChannelsGates"]
 __all__ += ["gates", "noise_free_gates", "legacy_gates"]
 __all__ += [
     "standard_gates",
