@@ -362,14 +362,14 @@ class CustomNoiseGates(object):
         Scaling factor for T2 dephasing times
     """
 
-    def __init__(self, p_scale: float = 1.0, T1_scale: float = 1.0, T2_scale: float = 1.0, pulse: Pulse=constant_pulse):
+    def __init__(self, scale = True, p_scale: float = 1.0, T1_scale: float = 1.0, T2_scale: float = 1.0, pulse: Pulse=constant_pulse):
         for name, val in {
             "p_scale": p_scale,
             "T1_scale": T1_scale,
             "T2_scale": T2_scale,
         }.items():
             assert val >= 1e-15, f"{name} too small: {val} < 1e-15."
-        
+        self.scale = scale
         self.p_scale = p_scale
         self.T1_scale = T1_scale
         self.T2_scale = T2_scale
@@ -380,12 +380,24 @@ class CustomNoiseGates(object):
         return self.gates.relaxation(Dt, T1 / self.T1_scale, T2 / self.T2_scale)
 
     def bitflip(self, Dt, p) -> np.array:
+        if not self.scale:
+            return self.gates.bitflip(Dt, self.p_scale)
         return self.gates.bitflip(Dt, p * self.p_scale)
 
     def depolarizing(self, Dt, p) -> np.array:
+        if not self.scale:
+            return self.gates.depolarizing(Dt, self.p_scale)
         return self.gates.depolarizing(Dt, p * self.p_scale)
 
     def single_qubit_gate(self, theta, phi, p, T1, T2) -> np.array:
+        if not self.scale:
+            return self.gates.single_qubit_gate(
+                theta,
+                phi,
+                self.p_scale,
+                T1 / self.T1_scale,
+                T2 / self.T2_scale
+            )
         return self.gates.single_qubit_gate(
             theta,
             phi,
@@ -395,12 +407,27 @@ class CustomNoiseGates(object):
         )
 
     def X(self, phi, p, T1, T2) -> np.array:
+        if not self.scale:
+            return self.gates.X(phi, self.p_scale, T1 / self.T1_scale, T2 / self.T2_scale)
         return self.gates.X(phi, p * self.p_scale, T1 / self.T1_scale, T2 / self.T2_scale)
 
     def SX(self, phi, p, T1, T2) -> np.array:
+        if not self.scale:
+            return self.gates.SX(phi, self.p_scale, T1 / self.T1_scale, T2 / self.T2_scale)
         return self.gates.SX(phi, p * self.p_scale, T1 / self.T1_scale, T2 / self.T2_scale)
 
     def CR(self, theta, phi, t_cr, p_cr, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+        if not self.scale:
+            return self.gates.CR(
+                theta,
+                phi,
+                t_cr,
+                self.p_scale,
+                T1_ctr / self.T1_scale,
+                T2_ctr / self.T2_scale,
+                T1_trg / self.T1_scale,
+                T2_trg / self.T2_scale,
+            )
         return self.gates.CR(
             theta,
             phi,
@@ -413,6 +440,19 @@ class CustomNoiseGates(object):
         )
 
     def CNOT(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+        if not self.scale:
+            return self.gates.CNOT(
+                phi_ctr,
+                phi_trg,
+                t_cnot,
+                p_cnot * self.p_scale,
+                self.p_scale,
+                self.p_scale,
+                T1_ctr / self.T1_scale,
+                T2_ctr / self.T2_scale,
+                T1_trg / self.T1_scale,
+                T2_trg / self.T2_scale,
+            )
         return self.gates.CNOT(
             phi_ctr,
             phi_trg,
@@ -427,6 +467,19 @@ class CustomNoiseGates(object):
         )
 
     def CNOT_inv(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+        if not self.scale:
+            return self.gates.CNOT_inv(
+                phi_ctr,
+                phi_trg,
+                t_cnot,
+                p_cnot * self.p_scale,
+                self.p_scale,
+                self.p_scale,
+                T1_ctr / self.T1_scale,
+                T2_ctr / self.T2_scale,
+                T1_trg / self.T1_scale,
+                T2_trg / self.T2_scale,
+            )
         return self.gates.CNOT_inv(
             phi_ctr,
             phi_trg,
@@ -441,6 +494,19 @@ class CustomNoiseGates(object):
         )
     
     def ECR(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+        if not self.scale:
+            return self.gates.ECR(
+                phi_ctr,
+                phi_trg,
+                t_ecr,
+                p_ecr * self.p_scale,
+                self.p_scale,
+                self.p_scale,
+                T1_ctr / self.T1_scale,
+                T2_ctr / self.T2_scale,
+                T1_trg / self.T1_scale,
+                T2_trg / self.T2_scale
+            )
         return self.gates.ECR(
             phi_ctr,
             phi_trg,
@@ -455,6 +521,19 @@ class CustomNoiseGates(object):
         )
     
     def ECR_inv(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+        if not self.scale:
+            return self.gates.ECR_inv(
+                phi_ctr,
+                phi_trg,
+                t_ecr,
+                p_ecr * self.p_scale,
+                self.p_scale,
+                self.p_scale,
+                T1_ctr / self.T1_scale,
+                T2_ctr / self.T2_scale,
+                T1_trg / self.T1_scale,
+                T2_trg / self.T2_scale
+            )
         return self.gates.ECR_inv(
             phi_ctr,
             phi_trg,
@@ -481,6 +560,7 @@ class CustomNoiseChannelsGates(object):
     def __init__(
         self,
         noiseless_qubits,
+        scale= True,
         p_scale=1.0,
         T1_scale=1.0,
         T2_scale=1.0,
@@ -490,6 +570,7 @@ class CustomNoiseChannelsGates(object):
 
         self.noise_free = NoiseFreeGates()
         self.noisy = CustomNoiseGates(
+            scale = True,
             p_scale=p_scale,
             T1_scale=T1_scale,
             T2_scale=T2_scale,

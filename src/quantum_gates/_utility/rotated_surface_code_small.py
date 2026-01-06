@@ -1,22 +1,25 @@
 import math
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
+import numpy as np
+import pymatching
+from scipy.sparse import lil_matrix
 
 from quantum_gates.simulators import MrAndersonSimulator
 from quantum_gates.gates import standard_gates, NoiseFreeGates
 from quantum_gates.circuits import EfficientCircuit, BinaryCircuit
 from quantum_gates.utilities import DeviceParameters
 
-import numpy as np
-import matplotlib.pyplot as plt
-import pymatching
-from scipy.sparse import lil_matrix
 from qiskit.circuit.controlflow import ControlFlowOp 
-
 from qiskit.transpiler import CouplingMap
 from qiskit_ibm_runtime.fake_provider import FakeBrisbane
+from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 
 
 class RotatedSurfaceCode_Small:
+    """
+    Minimal toy implementation of a rotated surface code with two data qubits
+    and two stabilizers, intended for debugging, validation, and initial
+    experiments.
+    """
     def __init__(self, distance=1, cycles = 1, aer=False, error=None):
         self.d = distance
         self.n_rows = 2
@@ -65,12 +68,9 @@ class RotatedSurfaceCode_Small:
         # Now setup the decoder (needs x_stabilizers, z_stabilizers, and stabilizer_connections)
         self.setup_decoder()
     
-
 # ========================================================================
 #  LAYOUT METHODS
 #  ========================================================================  
-
-    
 
     def _build_stabilizer_layer(self):
         """Build one stabilizer measurement cycle for a distance-n surface code."""
@@ -127,7 +127,7 @@ class RotatedSurfaceCode_Small:
             self.qc.measure(data_qubit, self.c_data[i])
         self.qc.barrier()
 
-        self.qc.x(range(0,self.n_qubits))  # introduce bit-flip errors on all data qubits
+        self.qc.x(range(0,self.n_qubits)) 
         self.qc.barrier()
 
 # ========================================================================
@@ -165,10 +165,10 @@ class RotatedSurfaceCode_Small:
 
         )
         if initial_state is None:
-            #alpha = 1 / math.sqrt(2)
+            alpha = 1 / math.sqrt(2)
             initial_state = np.zeros(2**self.n_qubits)
-            initial_state[0] = 1 
-            #initial_state[6] = alpha 
+            initial_state[0] = alpha
+            initial_state[6] = alpha 
 
         device_param_lookup = self._get_device_parameters(backend)
         
@@ -200,14 +200,12 @@ class RotatedSurfaceCode_Small:
 #  HELPER METHODS
 #  ========================================================================
 
-
     def _extract_stabilizer_measurements(self, bitstring):
         """
         Extract measurement results for all stabilizers across all cycles.
         Returns separate arrays for X and Z stabilizers.
         """
         bits = bitstring[::-1]  # reverse Qiskit order
-        print("Extracting stabilizer measurements from bitstring:", bits)
         x_syndromes = np.zeros((self.cycles, len(self.x_stabilizers)), dtype=int)
         z_syndromes = np.zeros((self.cycles, len(self.z_stabilizers)), dtype=int)
         for c in range(self.cycles):
@@ -295,119 +293,6 @@ class RotatedSurfaceCode_Small:
         return device_param_lookup  
 
 # ========================================================================
-#  PLOTTING METHODS
-#  ========================================================================
-   
-    def analyze_results(self, processed_counts):
-        """
-        Pretty-print the already-processed measurement counts.
-        Returns counts organized by cycle.
-        """
-        results_by_cycle = {}
-        for bitstring, count in processed_counts.items():
-            cycle_measurements = bitstring.split()
-            for cycle_idx, cycle_bits in enumerate(cycle_measurements):
-                if cycle_idx not in results_by_cycle:
-                    results_by_cycle[cycle_idx] = {}
-                results_by_cycle[cycle_idx][cycle_bits] = results_by_cycle[cycle_idx].get(cycle_bits, 0) + count
-        
-        return results_by_cycle
-
-    def _plot_single_shot(self, bitstring, shot_idx=None):
-        """Plot single-shot stabilizer measurements timeline."""
-        plt.figure(figsize=(10, 3))
-        
-        # Use the helper function
-        x_syndromes, z_syndromes = self._extract_stabilizer_measurements(bitstring)
-        
-        # Plot X stabilizers
-        for i, stab in enumerate(self.x_stabilizers):
-            bits = x_syndromes[:, i]  # Get column i (all cycles for this stabilizer)
-            plt.step(
-                range(1, len(bits) + 1),
-                bits,
-                where='mid',
-                label=f'X stabilizer {stab}',
-                marker='o',
-                linewidth=2,
-                markersize=6,
-                alpha=0.7,
-                linestyle='-'
-            )
-
-        # Plot Z stabilizers
-        for i, stab in enumerate(self.z_stabilizers):
-            bits = z_syndromes[:, i]  # Get column i (all cycles for this stabilizer)
-            plt.step(
-                range(1, len(bits) + 1),
-                bits,
-                where='mid',
-                label=f'Z stabilizer {stab}',
-                marker='s',
-                linewidth=2,
-                markersize=6,
-                alpha=0.7,
-                linestyle='--'
-            )
-
-        title = "Single-shot stabilizer measurements"
-        if shot_idx is not None:
-            title += f" — Shot {shot_idx + 1}"
-        plt.title(title, fontsize=14)
-        plt.xlabel("Cycle", fontsize=12)
-        plt.ylabel("Measurement", fontsize=12)
-        plt.yticks([0, 1])
-        plt.xticks(range(1, self.cycles + 1))
-        plt.grid(alpha=0.4)
-        plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-        plt.tight_layout()
-        plt.show()
-
-    def plot_results(self, counts, plot_each_shot):
-        """
-        Plot measurement results for the surface code.
-        - If 1 shot: timeline plot of stabilizer outcomes per cycle.
-        - If >1 shots:
-            - If plot_each_shot=True: plot each shot individually like single-shot mode.
-            - If plot_each_shot=False: plot aggregated histogram (default behavior).
-        """
-        total_shots = self.shots
-        # --- Case 1: only one shot ---
-        if total_shots == 1:
-            bitstring = list(counts.keys())[0][::-1]
-            self._plot_single_shot(bitstring)
-            return
-
-        # --- Case 2: multiple shots ---
-        if plot_each_shot:
-            all_bitstrings = list(counts.keys())
-            for i in range(total_shots):
-                bitstring = all_bitstrings[i][::-1]   # get i-th bitstring, reversed
-                self._plot_single_shot(bitstring, shot_idx=i)
-        else:
-            analyzed = self.analyze_results(counts)
-            flat_results = {
-                f"stab{stab}:{key}": val
-                for stab, patterns in analyzed.items()
-                for key, val in patterns.items()
-            }
-
-            labels = list(flat_results.keys())
-            values = list(flat_results.values())
-
-            plt.figure(figsize=(10, 3))
-            plt.bar(range(len(labels)), values, color='steelblue', edgecolor='black')
-
-            plt.xticks(range(len(labels)), labels, rotation=90, fontsize=8)
-            plt.xlabel("Stabilizer syndromes")
-            plt.ylabel("Counts")
-            plt.title(f"{total_shots} shots - Stabilizer syndromes")
-
-            plt.tight_layout()
-            plt.show()
-    
-
-# ========================================================================
 #  DECODER METHODS
 #  ========================================================================
 
@@ -443,8 +328,6 @@ class RotatedSurfaceCode_Small:
         self.H_X = self._build_parity_check_matrix('X')
         self.H_Z = self._build_parity_check_matrix('Z')
         
-
- 
     def _decode_per_cycle(self, syndrome1, syndrome2, which='X'):
         # Bitwise XOR between consecutive cycles
         syndrome = np.bitwise_xor(syndrome1, syndrome2).astype(np.uint8).flatten()

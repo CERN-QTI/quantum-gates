@@ -1,18 +1,14 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
 from qiskit import QuantumCircuit,QuantumRegister, ClassicalRegister, transpile
+from qiskit.circuit.controlflow import ControlFlowOp 
+from qiskit_ibm_runtime.fake_provider import FakeBrisbane
 
 from quantum_gates.simulators import MrAndersonSimulator
 from quantum_gates.gates import standard_gates, noise_free_gates
 from quantum_gates.circuits import EfficientCircuit, BinaryCircuit
 from quantum_gates.utilities import DeviceParameters
-import numpy as np
-import matplotlib.pyplot as plt
-from qiskit.circuit.controlflow import ControlFlowOp 
-
-
-from qiskit_ibm_runtime.fake_provider import FakeBrisbane
-
-
-
 
 class SurfaceCode:
     def __init__(self, distance=3, cycles = 1):
@@ -38,8 +34,6 @@ class SurfaceCode:
         self.qc = QuantumCircuit(self.q_register, *self.cycle_cregs, self.c_data)
 
 
-        # define data and stabilizer indices based on even/odd parity
-
         self.stabilizers = [i for i in range((self.n_qubits)) if i % 2 == 1]
         self.data_qubits, self.x_stabilizers, self.z_stabilizers = self._get_surface_code_layout()
 
@@ -51,8 +45,7 @@ class SurfaceCode:
 
         self._build_stabilizer_layer()
         self.stabilizer_connections = self._compute_stabilizer_connections()
-
-        
+     
     def _get_surface_code_layout(self):
         """
         Return indices of X stabilizers, Z stabilizers, and data qubits
@@ -73,12 +66,10 @@ class SurfaceCode:
         z_stabilizers = [self._qubit_index(r, c) for r, c in zip(rows[mask_z], cols[mask_z])]
 
         return data_qubits, x_stabilizers, z_stabilizers
-
     
     def _qubit_index(self, r, c):
             return r * self.width + c
-    
-    
+        
     def _get_neighbors(self, r, c):
             """Return indices of data qubits adjacent to stabilizer at (r,c)."""
             neighbors = []
@@ -88,12 +79,12 @@ class SurfaceCode:
                     neighbors.append(self._qubit_index(rr, cc))
             return neighbors
 
-    
     def _build_stabilizer_layer(self):
-        """Build one stabilizer measurement cycle for a distance-n surface code."""
+        """Build stabilizer measurement cycles for a distance-n surface code."""
 
         # repeat the stabilizer-measurement process for all cycles
         for cycle in range(self.cycles):
+
             # --- Reset all stabilizers at the beginning of the cycle ---
             for anc in self.x_stabilizers + self.z_stabilizers:
                 self.qc.reset(anc)
@@ -115,21 +106,19 @@ class SurfaceCode:
             # --- Z stabilizers ---
             for anc in self.z_stabilizers:
                 r, c = divmod(anc, self.width)
-                # entangle with data qubits (data is control, ancilla target)
+                # entangle with data qubits (data is control, ancilla is target)
                 for nb in self._get_neighbors(r, c):
                     self.qc.cx(nb, anc)
 
                 self.qc.barrier()
             
             # --- Measure all stabilizers for this cycle --- 
-            
             stab_list = sorted(self.x_stabilizers + self.z_stabilizers)
             for i, anc in enumerate(stab_list):
                 self.qc.measure(anc, self.cycle_cregs[cycle][i])
 
-
             #self.qc.save_statevector(label=f"save_sv_{cycle}")
-            self.qc.barrier(label=f"save_sv_{cycle}") # replave with save_statevector with barrier
+            self.qc.barrier(label=f"save_sv_{cycle}") 
             
             
          # --- Final measurement of data qubits in Z basis ---
@@ -137,19 +126,11 @@ class SurfaceCode:
             self.qc.measure(data_qubit, self.c_data[i])
         self.qc.barrier()
 
-        self.qc.x(range(0,self.n_qubits))  # introduce bit-flip errors on all data qubits
+        self.qc.x(range(0,self.n_qubits)) 
         
-
     def _split_counts(self, raw_counts: dict, register_sizes: list) -> dict:
         """
         Splits the concatenated bitstrings in the dictionary keys based on a list of register sizes.
-
-        Args:
-            raw_counts (dict): Dictionary where keys are concatenated bitstrings.
-            register_sizes (list): List of integers representing the size of each classical register.
-
-        Returns:
-            dict: A new dictionary with keys split by spaces according to register_sizes.
         """
         processed_counts = {}
         expected_length = sum(register_sizes)
@@ -195,7 +176,6 @@ class SurfaceCode:
         
         return x_syndromes, z_syndromes
     
-
     def _compute_stabilizer_connections(self):
         """
         Compute which data qubits each stabilizer measures.
@@ -213,10 +193,8 @@ class SurfaceCode:
         
         return connections
 
-
     def run_surfacecode(self, noise, shots = 1):
         """Run the surface code circuit on the specified backend with noise model."""
-        #backend = self._create_backend()
         backend = FakeBrisbane()
         if noise:
             set_gate = standard_gates
@@ -244,13 +222,11 @@ class SurfaceCode:
             op = instr.operation
             if op.name == 'delay' or op.name == 'barrier':
                 continue
-            # support any arity
+            
             for qb in instr.qubits:
                 q = qb._index
                 if q not in used_qubits:
                     used_qubits.append(q)
-                    
-        print(f"Qubits used in transpiled circuit: {sorted(used_qubits)}")
 
         max_qubit = max(used_qubits)
         nqubit_actual = max_qubit + 1
@@ -259,7 +235,6 @@ class SurfaceCode:
 
         initial_psi[0] = 1.0  # set |00...0⟩
 
-        #  Load via YOUR class and save JSON next to the script
         device_param = DeviceParameters(list(range(nqubit_actual)))
         device_param.load_from_backend(backend)
         device_param_lookup = device_param.__dict__()
@@ -284,100 +259,6 @@ class SurfaceCode:
         #print("Register sizes for splitting:", register_size)
         processed_counts = self._split_counts(mid_counts, register_size) 
         
-        #TODO: return predictions_x, predictions_z
-        '''
-        corrected_counts, data_counts, predictions_x, predictions_z = self.decode_correct_counts(mid_counts)
-
-        # --- Process mid_counts to separate registers ---
-        register_size= [self.n_data]+ [self.n_stabilizers]*self.cycles 
-        
-        processed_counts = self._split_counts(corrected_counts, register_size)
-        return processed_counts, data_counts, t_circ, barrier_statevectors, predictions_x, predictions_z
-        '''
         return processed_counts, t_circ, barrier_statevectors
     
-    
-   
-    def analyze_results(self, counts):
-        """
-        Analyze measurement results using stabilizer-to-classical-bit mapping.
-        Returns a dict: stabilizer → {bitstring_pattern: frequency}.
-        """
-        results = {stab: {} for stab in (self.x_stabilizers + self.z_stabilizers)}
-
-        for bitstring, count in counts.items():
-            # Use the helper function
-            x_syndromes, z_syndromes = self._extract_stabilizer_measurements(bitstring)
-            
-            # Process X stabilizers
-            for i, stab in enumerate(self.x_stabilizers):
-                # Get measurements for this stabilizer across all cycles
-                bits_for_stab = tuple(x_syndromes[:, i])
-                results[stab][bits_for_stab] = results[stab].get(bits_for_stab, 0) + count
-            
-            # Process Z stabilizers
-            for i, stab in enumerate(self.z_stabilizers):
-                bits_for_stab = tuple(z_syndromes[:, i])
-                results[stab][bits_for_stab] = results[stab].get(bits_for_stab, 0) + count
-
-        # pretty string output
-        pretty = {
-            stab: {','.join(map(str, k)): v for k, v in res.items()} 
-            for stab, res in results.items()
-        }
-
-        return pretty
-
-    def plot_single_shot(self, bitstring, shot_idx=None):
-        """Plot single-shot stabilizer measurements timeline."""
-        plt.figure(figsize=(10, 3))
-        
-        # Use the helper function
-        x_syndromes, z_syndromes = self._extract_stabilizer_measurements(bitstring)
-        
-        # Plot X stabilizers
-        for i, stab in enumerate(self.x_stabilizers):
-            bits = x_syndromes[:, i]  # Get column i (all cycles for this stabilizer)
-            plt.step(
-                range(1, len(bits) + 1),
-                bits,
-                where='mid',
-                label=f'X stabilizer {stab}',
-                marker='o',
-                linewidth=2,
-                markersize=6,
-                alpha=0.7,
-                linestyle='-'
-            )
-
-        # Plot Z stabilizers
-        for i, stab in enumerate(self.z_stabilizers):
-            bits = z_syndromes[:, i]  # Get column i (all cycles for this stabilizer)
-            plt.step(
-                range(1, len(bits) + 1),
-                bits,
-                where='mid',
-                label=f'Z stabilizer {stab}',
-                marker='s',
-                linewidth=2,
-                markersize=6,
-                alpha=0.7,
-                linestyle='--'
-            )
-
-        title = "Single-shot stabilizer measurements"
-        if shot_idx is not None:
-            title += f" — Shot {shot_idx + 1}"
-        plt.title(title, fontsize=14)
-        plt.xlabel("Cycle", fontsize=12)
-        plt.ylabel("Measurement", fontsize=12)
-        plt.yticks([0, 1])
-        plt.xticks(range(1, self.cycles + 1))
-        plt.grid(alpha=0.4)
-        plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-        plt.tight_layout()
-        plt.show()
-
-    
-
     
