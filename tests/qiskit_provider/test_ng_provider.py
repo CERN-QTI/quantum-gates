@@ -1,4 +1,5 @@
 import pytest
+import warnings
 import numpy as np
 import os
 from dotenv import load_dotenv
@@ -9,7 +10,9 @@ from qiskit_ibm_runtime.fake_provider import FakeProviderForBackendV2
 from qiskit.circuit.random import random_circuit
 from qiskit_ibm_runtime.fake_provider import FakeKyiv
 
+
 from src.quantum_gates.qiskit_provider import NoisyGatesProvider
+
 
 load_dotenv()
 IBM_TOKEN = os.getenv("IBM_TOKEN", "")
@@ -64,16 +67,28 @@ def test_bell_state_distribution():
 def test_ng_provider_vs_standard_qiskit():
     """Compare the Noisy Gates backend with the standard Qiskit provider
     for a Bell state circuit. Frequencies should be close."""
-    # Arrange
-    provider = NoisyGatesProvider(token=IBM_TOKEN, crn_instance=CRN)
-    backend = provider.get_ibm_backend('ibm_brisbane')
-
-    # IBM fake backend
-    fake_provider = FakeProviderForBackendV2()
-    fake_backend = fake_provider.backend('fake_brisbane')
 
     shots = 1000
     n_qubit = 2
+    threshold = 0.1  # maximum acceptable difference
+
+    # Fake IBM backend (always available)
+    fake_provider = FakeProviderForBackendV2()
+    fake_backend = fake_provider.backend("fake_brisbane")
+
+    # Try to get real IBM backend
+    try:
+        provider = NoisyGatesProvider(token=IBM_TOKEN, crn_instance=CRN)
+        backend = provider.get_ibm_backend("ibm_brisbane")
+    except Exception:
+        warnings.warn(
+            "IBM Quantum backend 'ibm_brisbane' not available. "
+            "Falling back to FakeBackend. "
+            "This test will not use real device noise.",
+            RuntimeWarning,
+        )
+        provider = NoisyGatesProvider()
+        backend = provider.get_ibm_backend('fake_brisbane')
 
     # Create Bell state circuit
     circ = QuantumCircuit(n_qubit, n_qubit)
@@ -104,7 +119,6 @@ def test_ng_provider_vs_standard_qiskit():
     c_11 = np.abs(ibm_count['11']/shots - count['11'])
 
     # Assert that the distribution is close
-    threshold = 0.1  # maximum acceptable difference
 
     assert c_00 <= threshold, f"Mismatch on 00: diff={c_00:.3f}"
     assert c_01 <= threshold, f"Mismatch on 01: diff={c_01:.3f}"
