@@ -181,7 +181,7 @@ def setup_backend(Token: str = None, device_name: str | FakeBackendV2 = None, cr
     if use_fake:
         backend = device_name
     else:
-        service = QiskitRuntimeService(channel='ibm_quantum_platform', token=Token, instance = crn)
+        service = QiskitRuntimeService(channel='ibm_quantum_platform', token=Token, instance=crn)
         backend = service.backend(device_name)
     return backend
 

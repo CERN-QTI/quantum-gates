@@ -6,7 +6,7 @@ from qiskit_ibm_runtime.fake_provider import FakeBrisbane, FakeKyoto
 
 from src.quantum_gates.utilities import create_random_quantum_circuit, transpile_qiskit_circuit, setup_backend,fix_counts
 from src.quantum_gates.utilities import Optimizer
-from configuration.token import IBM_TOKEN, HUB, GROUP, PROJECT, CRN
+from configuration.token import HUB, GROUP, PROJECT, CRN
 from src.quantum_gates.utilities import DeviceParameters
 from src.quantum_gates.simulators import MrAndersonSimulator
 from src.quantum_gates.circuits import BinaryCircuit
@@ -15,19 +15,9 @@ from src.quantum_gates.backends import BinaryBackend
 from src.quantum_gates._simulation.simulator import _apply_gates_on_circuit
 
 
-backend_config = {
-    "hub": HUB,
-    "group": GROUP,
-    "project": PROJECT,
-    "device_name": "ibm_brisbane",
-    "crn" : CRN
-}
-
-#backend = setup_backend(IBM_TOKEN, **backend_config)
+location = "tests/helpers/device_parameters/ibm_kyoto/"
 
 backend = setup_backend(device_name=FakeBrisbane(), use_fake=True)
-
-location = "tests/helpers/device_parameters/ibm_kyoto/"
 
 
 def level_optimization(level: int, result: list, q: list, qc: list, n: int, psi0: np.array, sim: MrAndersonSimulator):
