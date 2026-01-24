@@ -94,7 +94,14 @@ class RelaxationFactory(object):
             ep = 0
         else:
             e2 = np.sqrt(tg/T2)
-            ep = np.sqrt((1/2) * (e2**2 - e1**2/2))
+            ep_squared = (1/2) * (e2**2 - e1**2/2) #updated to handel T2 > 2T1
+            
+            # Handle case where T2 > 2*T1 (physical constraint violated)
+            if ep_squared < 0:
+                print(f"Warning: T2 ({T2}) > 2*T1 ({2*T1}), clamping ep to 0")
+                ep = 0
+            else:
+                ep = np.sqrt(ep_squared)
 
         W = np.random.normal(0, np.sqrt(Dt))
         I = np.random.normal(0, np.sqrt(V(Dt)))
@@ -154,7 +161,14 @@ class SingleQubitGateFactory(object):
             ep = 0
         else:
             e2 = np.sqrt(tg/T2)
-            ep = np.sqrt((1/2) * (e2**2 - e1**2/2))
+            ep_squared = (1/2) * (e2**2 - e1**2/2) #updated to handel T2 > 2T1
+            
+            # Handle case where T2 > 2*T1 (physical constraint violated)
+            if ep_squared < 0:
+                print(f"Warning: T2 ({T2}) > 2*T1 ({2*T1}), clamping ep to 0")
+                ep = 0
+            else:
+                ep = np.sqrt(ep_squared)
 
         """ 1) UNITARY CONTRIBUTION """
 
@@ -439,7 +453,13 @@ class CRFactory(object):
             ep_ctr = 0
         else:
             e2_ctr = np.sqrt(tg/T2_ctr)
-            ep_ctr = np.sqrt((1/2) * (e2_ctr**2 - e1_ctr**2/2))
+            ep_ctr_squared = (1/2) * (e2_ctr**2 - e1_ctr**2/2)
+                
+            if ep_ctr_squared < 0:
+                # T2_ctr > 2*T1_ctr - clamp to zero
+                ep_ctr = 0
+            else:
+                ep_ctr = np.sqrt(ep_ctr_squared)
 
         if T1_trg == 0:
             e1_trg = 0
@@ -450,7 +470,13 @@ class CRFactory(object):
             ep_trg = 0
         else:
             e2_trg = np.sqrt(tg/T2_trg)
-            ep_trg = np.sqrt((1/2) * (e2_trg**2 - e1_trg**2/2))
+            ep_trg_squared = (1/2) * (e2_trg**2 - e1_trg**2/2)
+            
+            if ep_trg_squared < 0:
+                # T2_trg > 2*T1_trg - clamp to zero
+                ep_trg = 0
+            else:
+                ep_trg = np.sqrt(ep_trg_squared)
 
         U = np.array(
             [[np.cos(theta/2), -1J*np.sin(theta/2) * np.exp(-1J * phi), 0, 0],
