@@ -9,6 +9,9 @@ from qiskit_aer import AerSimulator
 from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit.circuit.random import random_circuit
 from qiskit.providers.backend import BackendV2 as Backend
+from qiskit_ibm_runtime import QiskitRuntimeService
+from qiskit_ibm_runtime.fake_provider.fake_backend import FakeBackendV2
+
 
 
 def fix_counts(counts_0: dict, n_qubits: int) -> dict:
@@ -162,23 +165,25 @@ def load_config(filename: str="") -> dict:
     return config
 
 
-def setup_backend(Token: str, hub: str, group: str, project: str, device_name: str, crn: str):
+def setup_backend(Token: str = None, device_name: str | FakeBackendV2 = None, crn: str = None, use_fake: bool = False):
     """Takes the backend configuration and returns the configured backend.
 
     Args:
         Token (str): Token generated with the IBM Quantum Experience account.
-        hub (str): Hub name of the account where the project is located.
-        group (str): Group name of the account.
-        project (str): Project under which the user has access to the device.
-        device_name (str): Name of the quantum device.
+        device_name (str | fake_provider): Name of the quantum device. If it is real provide a str data type, and if it is fake provide a fake_provider data type.
         crn (str): Token for the work instance
+        use_fake (bool): Decide to use a fake_backend instead of a real one. Default False
 
     Returns:
         An IBM Quantum provider backend object that provides access to the
         specified quantum device.
     """
-    provider = QiskitRuntimeService(channel='ibm_quantum_platform', token=Token, instance = crn)
-    return provider.backend(device_name)
+    if use_fake:
+        backend = device_name
+    else:
+        service = QiskitRuntimeService(channel='ibm_quantum_platform', token=Token, instance=crn)
+        backend = service.backend(device_name)
+    return backend
 
 
 def post_process_split(source_filenames: list, target_filenames: list, split: int):

@@ -21,7 +21,7 @@ authors:
   given-names: "Angelo"
   orcid: "https://orcid.org/0000-0001-7500-387X"
 title: "Noisy gates for simulating quantum computers"
-version: 2.2
+version: 2.4.0
 doi: "10.1103/PhysRevResearch.5.043210"
 date-released: 2023-12-06
 url: "https://link.aps.org/doi/10.1103/PhysRevResearch.5.043210"
