@@ -2,11 +2,10 @@ import pytest
 import random
 import numpy as np
 from qiskit import QuantumCircuit
-from qiskit_ibm_runtime.fake_provider import FakeBrisbane, FakeKyoto
+from qiskit_ibm_runtime.fake_provider import FakeBrisbane
 
 from src.quantum_gates.utilities import create_random_quantum_circuit, transpile_qiskit_circuit, setup_backend,fix_counts
 from src.quantum_gates.utilities import Optimizer
-from configuration.token import HUB, GROUP, PROJECT, CRN
 from src.quantum_gates.utilities import DeviceParameters
 from src.quantum_gates.simulators import MrAndersonSimulator
 from src.quantum_gates.circuits import BinaryCircuit
@@ -51,7 +50,7 @@ def level_optimization(level: int, result: list, q: list, qc: list, n: int, psi0
             psi0 = U.dot(psi0)
 
     probs = np.square(np.absolute(psi0))
-    sums = sim._measurament(prob=probs, q_meas_list=qc, n_qubit=n, qubits_layout=q)
+    sums = sim._measurement(prob=probs, q_meas_list=qc, n_qubit=n)
     goal = dict(fix_counts(sums, len(qc)))
     goal_list = np.array([value for key, value in goal.items()])
 
@@ -93,7 +92,7 @@ def test_optimization_algorithm_random_layout(nqubits: int, depth: int, seed: in
     """Preparation"""
 
     random.seed(nqubits+depth+seed)
-    qubit_layout = random.sample(range(0, 11), nqubits)
+    qubit_layout = list(range(nqubits))
     print("qubit layout: ", qubit_layout)
 
     circ = create_random_quantum_circuit(n_qubit=nqubits, depth=depth, seed_circ=seed, measured_qubit=2)
@@ -125,12 +124,22 @@ def perform_test(
 
     print(f"qubits_layout: {qubits_layout}, qc: {qc}, n: {n}")
 
-    n_rz, swap_detector, data = sim._preprocess_circuit(t_qiskit_circ=t_circ, qubits_layout=qubits_layout, nqubit=n)
-    depth_ = len(data) - n_rz + 1
+    n_rz, data, _data_measure = sim._preprocess_circuit(
+        t_qiskit_circ=t_circ,
+        n_qubit_used=n,
+        used_logicals=qubits_layout,
+    )
 
-    circuit = BinaryCircuit(nqubit = n, depth=depth_, gates= standard_gates)
-    _apply_gates_on_circuit(data, circuit, device_param, qubits_layout)
+    circuit = BinaryCircuit(
+        nqubit = n,
+        depth=1, # BinaryCircuit ignores this value
+        gates=standard_gates,
+    )
+    for chunk, flag in data:
+        if flag == 0:
+            _apply_gates_on_circuit(chunk, circuit, device_param)
 
+    # Todo: Check if we should make this member public.
     result = circuit._info_gates_list
 
     psi0 = [1] + [0] * (2**n-1) # starting state

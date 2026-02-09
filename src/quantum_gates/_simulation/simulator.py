@@ -154,7 +154,7 @@ class MrAndersonSimulator(object):
             raise ValueError("Internal error: probability vector length is not a power of two.")
 
         # produce final counts-style readout
-        counts_ng = self._measurament(
+        counts_ng = self._measurement(
             prob=final_arr,
             q_meas_list=q_meas_list,
             n_qubit=prob_width,       # if your simulator always returns full width, this equals nqubit
@@ -474,8 +474,8 @@ class MrAndersonSimulator(object):
         
         return r_mean, all_results
     
-    
-    def _measurament(self, prob : np.array, q_meas_list : list, n_qubit: int) -> dict: 
+    # Todo: Correct naming.
+    def _measurement(self, prob : np.array, q_meas_list : list, n_qubit: int) -> dict:
         """This function take in input the measured qubits and the classical bits to store the information regarding also the swapping and give in ouput the probabilities of the possible outcomes.
 
         Args:

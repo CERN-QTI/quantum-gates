@@ -109,12 +109,15 @@ class Optimizer(object):
             list: Return the first level optimize list of gate
         """
         result_1 = []
+        if len(gate_list) < 2:
+            return gate_list
 
         while gate_list:
             if len(gate_list[0][1]) == 1: # check if the current element is a 1q gate
                 qubit = gate_list[0][1]
                 c = 1
-                while len(gate_list[c][1]) == 1 and qubit == gate_list[c][1]: # count how many successive gate have the same qubit
+                # count how many successive gate have the same qubit
+                while c < len(gate_list) and len(gate_list[c][1]) == 1 and qubit == gate_list[c][1]:
                     c += 1
                 if c > 1:
                     gates = []
