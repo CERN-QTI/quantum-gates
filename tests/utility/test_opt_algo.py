@@ -187,3 +187,15 @@ def perform_test(
     assert all((i < 10e-12 for i in check_02)), f"Results from level 0 and 2 mismatch"
     assert all((i < 10e-12 for i in check_03)), f"Results from level 0 and 3 mismatch"
     assert all((i < 10e-12 for i in check_04)), f"Results from level 0 and 4 mismatch"
+
+
+def test_opt_level_1_merging_two_1q_gates_does_not_oob():
+    U = np.eye(2, dtype=complex)
+    gate_list = [[U, [0]], [U, [0]]]  # two successive 1q gates on same qubit
+    opt = Optimizer(level_opt=1, qubit_list=[0], circ_list=gate_list)
+
+    out = opt.opt_level_1(gate_list.copy())
+
+    # After optimization, they should merge into a single gate on qubit 0.
+    assert len(out) == 1
+    assert out[0][1] == [0]
