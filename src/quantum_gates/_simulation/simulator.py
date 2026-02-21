@@ -156,8 +156,8 @@ class MrAndersonSimulator(object):
         # produce final counts-style readout
         counts_ng = self._measurement(
             prob=final_arr,
-            q_meas_list=q_meas_list,
-            n_qubit=prob_width,       # if your simulator always returns full width, this equals nqubit
+            q_meas_list=data_measure,
+            n_qubit=prob_width,
         )
         
         # --- Build mid-circuit bitstrings with chronological processing ---
@@ -408,8 +408,8 @@ class MrAndersonSimulator(object):
         r_square_sum = np.zeros(2**nqubit)
 
         # Constants
-        # depth is the number of gates / ops in the circuit (excluding rz's) +1
-        depth = len(data) - n_rz + 1
+        total_ops = sum(len(chunk) for chunk, flag in data if flag == 0)
+        depth = total_ops - n_rz + 1
 
         # Create list of args
         arg_list = [
