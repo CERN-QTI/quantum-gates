@@ -98,9 +98,12 @@ class Circuit(object):
         Returns:
              output statevector
         """
+        if self.j == 0 and self.s == 0:
+            return psi0.copy()
         self.circuit = np.array(self.circuit, dtype=object)
+        actual_depth = self.j + 1
         matrix_prod = ft.reduce(np.kron, self.circuit[:, 0])
-        for i in range(1, self.depth):
+        for i in range(1, actual_depth):
             matrix_prod = ft.reduce(np.kron, self.circuit[:, i]) @ matrix_prod
         psi = matrix_prod @ psi0
         return psi
@@ -434,14 +437,11 @@ class Circuit(object):
 
     def reset(self, phase_reset: bool = True):
         """ Reset the circuit to the initial state. """
-        # need to only reset phases if specified, avoids transpiled gate phase accumulation issues
-        if phase_reset: 
+        if phase_reset:
             self.phi = [0 for i in range(self.nqubit)]
-            
-        self._s = 0
-        self._backend = self._BackendClass(self.nqubit)
-        self._mp = [1 for i in range(self.nqubit)]
-        self._mp_list = []
+        self.j = 0
+        self.s = 0
+        self.circuit = [[1 for i in range(self.depth)] for j in range(self.nqubit)]
 
 
 class AlternativeCircuit(object):
