@@ -62,12 +62,12 @@ def level_optimization(level: int, result: list, q: list, qc: list, n: int, psi0
     [(n, d, seed) for n in [2, 3, 4, 5, 6, 7, 8] for d in [1, 2, 3, 4] for seed in [1,2,3,4]]
 )
 def test_optimization_algorithm(nqubits: int, depth: int, seed: int):
-    qubit_layout = list(np.arange(nqubits))
+    qubits_layout = list(np.arange(nqubits))
 
     circ = create_random_quantum_circuit(n_qubit=nqubits, depth=depth, seed_circ=seed, measured_qubit=2)
-    t_circ = transpile_qiskit_circuit(circ=circ, init_layout=qubit_layout,seed= 10, backend=backend)
+    t_circ = transpile_qiskit_circuit(circ=circ, init_layout=qubits_layout,seed= 10, backend=backend)
 
-    device_param = DeviceParameters(qubits_layout=qubit_layout)
+    device_param = DeviceParameters(qubits_layout=qubits_layout)
     device_param.load_from_texts(location=location)
     device_param = device_param.__dict__()
 
@@ -92,13 +92,13 @@ def test_optimization_algorithm_random_layout(nqubits: int, depth: int, seed: in
     """Preparation"""
 
     random.seed(nqubits+depth+seed)
-    qubit_layout = list(range(nqubits))
-    print("qubit layout: ", qubit_layout)
+    qubits_layout = list(range(nqubits))
+    print("qubits layout: ", qubits_layout)
 
     circ = create_random_quantum_circuit(n_qubit=nqubits, depth=depth, seed_circ=seed, measured_qubit=2)
-    t_circ = transpile_qiskit_circuit(circ=circ, init_layout=qubit_layout,seed= 10, backend=backend)
+    t_circ = transpile_qiskit_circuit(circ=circ, init_layout=qubits_layout,seed= 10, backend=backend)
 
-    device_param = DeviceParameters(list(np.arange(max(qubit_layout)+1)))
+    device_param = DeviceParameters(list(np.arange(max(qubits_layout)+1)))
     device_param.load_from_texts(location=location)
     device_param = device_param.__dict__()
 
@@ -126,7 +126,6 @@ def perform_test(
 
     n_rz, data, _data_measure = sim._preprocess_circuit(
         t_qiskit_circ=t_circ,
-        n_qubit_used=n,
         used_logicals=qubits_layout,
     )
 

@@ -106,3 +106,22 @@ def test_non_close_gate_binary_circuit():
     psi1 = circ.statevector(psi0)
     exp = np.array([0, 0, 0, 0, 0, 1, 0, 0])
     assert all(psi1[i] == exp[i] for i in range(2**n_qubit))
+
+
+def test_binary_circuit_reset_clears_previous_chunk_gates():
+    psi0 = np.array([1.0, 0.0], dtype=complex)
+    circ = BinaryCircuit(nqubit=1, depth=1, gates=standard_gates)
+
+    # First chunk: X on |0> -> |1>
+    circ.apply(gate=helper_gates.X, i=0)
+    psi = circ.statevector(psi0)
+
+    # Reset before second chunk and apply another X.
+    # If reset does not clear the previous gate list, this second chunk would
+    # effectively apply two X gates.
+    circ.reset(phase_reset=False)
+    circ.apply(gate=helper_gates.X, i=0)
+    psi = circ.statevector(psi)
+
+    expected = np.array([1.0, 0.0], dtype=complex)
+    assert np.allclose(psi, expected), f"Expected {expected} but found {psi}."

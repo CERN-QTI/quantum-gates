@@ -111,8 +111,6 @@ def test_backends_get_same_result_with_single_qubit_gates(nqubits: int, steps: i
 
     mp_list_b = [[gate, [i]] for step in range(steps) for i in range(nqubits)]
 
-    qubit_layout = np.arange(nqubits)
-
     # Setup backends
     one_tb = BackendForOnes(nqubits)
     efficient_tb = EfficientBackend(nqubits)

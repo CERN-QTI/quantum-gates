@@ -143,7 +143,7 @@ class NoisyGatesBackend(Backend):
         return classes
     
     def parameter_from_device(self, qubits_layout : list) -> dict:
-        """From a given configuration of the qubit_layout is return a dictionary with the information of the real device
+        """From a given configuration of the qubits_layout is return a dictionary with the information of the real device
 
         Args:
             qubits_layout (list): Layout of the physical qubit
@@ -203,7 +203,7 @@ class NoisyGatesBackend(Backend):
 
         self.options.shots = shots
         
-        # Preprocess the qubit_layout after the transpilation
+        # Preprocess the qubits_layout after the transpilation
         qubits_layout_t, qubit_bit, n_qubit_t = self.process_layout(circuits)
 
         n_measured_qubit = len(qubit_bit)  # Number of measured qubit
@@ -231,7 +231,7 @@ class NoisyGatesBackend(Backend):
         
         end = time.time()
 
-        # Measurament and post-process the result
+        # Measurement and post-process the result
         counts_ng = fix_counts(counts_ng["probs"], n_measured_qubit)  # convert in qiskit notation
 
         # Convert the result compatible with Qiskit

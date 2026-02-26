@@ -7,7 +7,7 @@ from qiskit_ibm_runtime.fake_provider import FakeBrisbane
 from src.quantum_gates.simulators import MrAndersonSimulator
 from src.quantum_gates.circuits import EfficientCircuit
 from src.quantum_gates._simulation.circuit import BinaryCircuit
-from src.quantum_gates.gates import standard_gates
+from src.quantum_gates.gates import standard_gates, noise_free_gates
 from src.quantum_gates._gates.gates import almost_noise_free_gates
 from src.quantum_gates.utilities import DeviceParameters
 from src.quantum_gates.quantum_algorithms import hadamard_reverse_qft_circ
@@ -21,6 +21,14 @@ _LAYOUT = [0, 1, 2, 3, 4]
 def _device_param(nqubits):
     """Load device parameters for a linear layout of nqubits."""
     dp = DeviceParameters(qubits_layout=_LAYOUT[:nqubits])
+    dp.load_from_texts(location=_location)
+    return dp.__dict__()
+
+
+def _device_param_for_layout(layout):
+    """Load parameters covering all physical indices used in `layout`."""
+    n_physical = max(layout) + 1
+    dp = DeviceParameters(qubits_layout=list(range(n_physical)))
     dp.load_from_texts(location=_location)
     return dp.__dict__()
 
@@ -43,6 +51,16 @@ def _transpile_midcircuit(circ, nqubits):
         circ,
         backend=_backend,
         initial_layout=_LAYOUT[:nqubits],
+        seed_transpiler=42,
+        optimization_level=0,
+    )
+
+
+def _transpile_with_layout(circ, layout):
+    return transpile(
+        circ,
+        backend=_backend,
+        initial_layout=layout,
         seed_transpiler=42,
         optimization_level=0,
     )
@@ -298,3 +316,114 @@ def test_repetition_code_zero_noise(n_cycles):
     assert total_prob_zero_data > 0.90, (
         f"Expected data qubits to remain |0...0> but got P={total_prob_zero_data:.4f}"
     )
+
+
+def _layout_mapping_regression_circuit():
+    qc = QuantumCircuit(2, 2)
+    qc.x(0)
+    qc.measure([0, 1], [0, 1])
+    return qc
+
+
+@pytest.mark.parametrize("circuit_class", [EfficientCircuit, BinaryCircuit])
+def test_contiguous_layout_explicit_matches_omitted(circuit_class):
+    """Passing an explicit contiguous qubits_layout=[0,1] must give the same
+    result as omitting it (the default identity mapping)."""
+    nqubits = 2
+    layout = [0, 1]
+    circ = _layout_mapping_regression_circuit()
+    t_circ = _transpile_with_layout(circ, layout)
+
+    psi0 = np.zeros(4, dtype=complex)
+    psi0[0] = 1.0
+    device_param = _device_param(nqubits)
+
+    sim = MrAndersonSimulator(gates=noise_free_gates, CircuitClass=circuit_class)
+
+    result_explicit = sim.run(
+        t_qiskit_circ=t_circ, psi0=psi0, shots=20,
+        device_param=device_param, nqubit=nqubits,
+        qubits_layout=layout, bit_flip_bool=False,
+    )
+    result_omitted = sim.run(
+        t_qiskit_circ=t_circ, psi0=psi0, shots=20,
+        device_param=device_param, nqubit=nqubits,
+        bit_flip_bool=False,
+    )
+
+    assert result_explicit["probs"] == result_omitted["probs"], (
+        f"{circuit_class.__name__}: explicit layout {layout} gave different "
+        f"result than omitted layout."
+    )
+
+
+@pytest.mark.parametrize("circuit_class", [EfficientCircuit, BinaryCircuit])
+def test_non_contiguous_layout_supported_with_qubits_layout(circuit_class):
+    """X on qubit 0 with non-contiguous layout [0,2] should produce '10'."""
+    layout = [0, 2]
+    t_circ = _transpile_with_layout(_layout_mapping_regression_circuit(), layout)
+
+    psi0 = np.zeros(4, dtype=complex)
+    psi0[0] = 1.0
+    sim = MrAndersonSimulator(gates=noise_free_gates, CircuitClass=circuit_class)
+
+    result = sim.run(
+        t_qiskit_circ=t_circ, psi0=psi0, shots=20,
+        device_param=_device_param_for_layout(layout), nqubit=2,
+        qubits_layout=layout, bit_flip_bool=False,
+    )
+
+    assert result["probs"].get("10", 0.0) > 0.99, (
+        f"{circuit_class.__name__}: Unexpected probabilities: {result['probs']}"
+    )
+
+
+def test_non_contiguous_layout_inference_matches_explicit_qubits_layout():
+    """When psi0 width equals the number of used qubits, the simulator should
+    infer the same mapping that an explicit qubits_layout would provide."""
+    layout = [0, 2]
+    t_circ = _transpile_with_layout(_layout_mapping_regression_circuit(), layout)
+
+    psi0 = np.zeros(4, dtype=complex)
+    psi0[0] = 1.0
+    device_param = _device_param_for_layout(layout)
+    sim = MrAndersonSimulator(gates=noise_free_gates, CircuitClass=BinaryCircuit)
+
+    result_explicit = sim.run(
+        t_qiskit_circ=t_circ, psi0=psi0, shots=20,
+        device_param=device_param, nqubit=2,
+        qubits_layout=layout, bit_flip_bool=False,
+    )
+    result_inferred = sim.run(
+        t_qiskit_circ=t_circ, psi0=psi0, shots=20,
+        device_param=device_param, nqubit=2,
+        bit_flip_bool=False,
+    )
+
+    assert result_explicit["probs"] == result_inferred["probs"]
+
+
+def test_non_contiguous_layout_backends_match():
+    """EfficientCircuit and BinaryCircuit must agree on a non-contiguous layout."""
+    layout = [0, 2]
+    t_circ = _transpile_with_layout(_layout_mapping_regression_circuit(), layout)
+
+    psi0 = np.zeros(4, dtype=complex)
+    psi0[0] = 1.0
+    device_param = _device_param_for_layout(layout)
+
+    sim_eff = MrAndersonSimulator(gates=noise_free_gates, CircuitClass=EfficientCircuit)
+    sim_bin = MrAndersonSimulator(gates=noise_free_gates, CircuitClass=BinaryCircuit)
+
+    result_eff = sim_eff.run(
+        t_qiskit_circ=t_circ, psi0=psi0, shots=20,
+        device_param=device_param, nqubit=2,
+        qubits_layout=layout, bit_flip_bool=False,
+    )
+    result_bin = sim_bin.run(
+        t_qiskit_circ=t_circ, psi0=psi0, shots=20,
+        device_param=device_param, nqubit=2,
+        qubits_layout=layout, bit_flip_bool=False,
+    )
+
+    assert result_eff["probs"] == result_bin["probs"]

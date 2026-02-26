@@ -2,7 +2,6 @@
 This module implements the base class to perform noisy quantum simulations with noisy gates approach
 """
 import numpy as np
-import itertools
 import functools as ft
 
 from .._gates.gates import Gates
@@ -86,7 +85,6 @@ class Circuit(object):
             self.s = 1
             self.j = self.j+1
             self.circuit[i][self.j] = gate
-   
 
     def statevector(self, psi0) -> np.array:
         """
@@ -107,7 +105,6 @@ class Circuit(object):
             matrix_prod = ft.reduce(np.kron, self.circuit[:, i]) @ matrix_prod
         psi = matrix_prod @ psi0
         return psi
-    
     
     def mid_measurement(self, psi0: np.ndarray, device_param, add_bitflip=False,
                     qubit_list=None, cbit_list=None) -> tuple[np.ndarray, list[int]]:
@@ -879,7 +876,7 @@ class BinaryCircuit(object):
         depth (int): Depth of the circuit (Doesn't use, but leave here to follow the structure of the previous Circuit Class)
         gates (int): Gateset from which the noisy quantum gates should be sampled.
         BackendClass (class): Will be ignored as we always use the BinaryBackend in the BinaryCircuit.
-        qubit_layout (np.array): Qubit layout in the case of non-linear topology. If not set, a linear topology will be assumed.
+        qubits_layout (np.array): Qubit layout in the case of non-linear topology. If not set, a linear topology will be assumed.
 
     Example:
         .. code:: python
@@ -888,13 +885,13 @@ class BinaryCircuit(object):
             from quantum_gates.gates import standard_gates
 
             n_qubit = 3
-            qubit_layout = [0,1,2]
+            qubits_layout = [0,1,2]
 
             circuit = BinaryCircuit(
                 nqubit=n_qubit,
                 depth=1,
                 gates=standard_gates,
-                qubit_layout=qubit_layout
+                qubits_layout=qubits_layout
             )
 
             X, CNOT = ...
@@ -914,12 +911,12 @@ class BinaryCircuit(object):
                  depth: int,
                  gates: Gates,
                  BackendClass: type(BinaryBackend) = BinaryBackend,
-                 qubit_layout: np.array=None):
+                 qubits_layout: np.array=None):
         self.nqubit: int = nqubit                   # Number of qubits
         self.gates: Gates = gates                   # Gate set to be used (specifies the noisy behaviour)
         self._backend = BinaryBackend(nqubit)       # Backend for the computations
         self._BackendClass = BinaryBackend          # Always BinaryBackend
-        self.qubit_layout = qubit_layout if qubit_layout else np.arange(self.nqubit)
+        self.qubits_layout = qubits_layout if qubits_layout is not None else np.arange(self.nqubit)
 
         # Bookkeeping
         self.phi = [0 for i in range(nqubit)]       # Phases
@@ -952,7 +949,7 @@ class BinaryCircuit(object):
         return self._backend.statevector(
             mp_list=self._info_gates_list,
             psi0=psi0,
-            qubit_layout=self.qubit_layout,
+            qubits_layout=self.qubits_layout,
         )
     
     def mid_measurement(self, psi0: np.ndarray, device_param, add_bitflip=False,
@@ -1267,6 +1264,7 @@ class BinaryCircuit(object):
         self._backend = self._BackendClass(self.nqubit)
         self._mp = [1 for i in range(self.nqubit)]
         self._mp_list = []
+        self._info_gates_list = []
 
 
 class StandardCircuit(AlternativeCircuit):
