@@ -106,6 +106,7 @@ class MrAndersonSimulator(object):
                 • **"mid_counts"** – aggregated mid-circuit measurement bitstrings.
                 • **"statevector_readout"** – measured statevectors, from mid measure.
         """
+        # Todo: Make it optional but mandatory if the user wants to use the BinaryBackend.
         if qubit_layout is not None:
             raise NotImplementedError("qubit_layout argument is deprecated; please use transpiled circuits instead.")
         
@@ -400,7 +401,7 @@ class MrAndersonSimulator(object):
                             device_param: dict,
                             psi0: np.array,
                             data_measure: list,
-                            bit_flip_bool: bool,) -> np.array:
+                            bit_flip_bool: bool) -> np.array:
         """ Performs the simulation shots many times and returns the resulting probability distribution.
         """
         # Setup results
@@ -412,6 +413,7 @@ class MrAndersonSimulator(object):
         depth = total_ops - n_rz + 1
 
         # Create list of args
+        # Todo: In case we BinaryCircuit, also pass the qubits_layout to the CircuitClass below.
         arg_list = [
             {
                 "data": copy.deepcopy(data),
