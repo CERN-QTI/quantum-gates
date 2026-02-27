@@ -124,9 +124,17 @@ def perform_test(
 
     print(f"qubits_layout: {qubits_layout}, qc: {qc}, n: {n}")
 
+    # Mirror simulator.run() mapping logic for non-contiguous physical layouts.
+    sim_to_phys = list(qubits_layout)
+    phys_to_sim = {phys: sim_idx for sim_idx, phys in enumerate(sim_to_phys)}
+    device_param_mapped = sim._remap_device_parameters(device_param, sim_to_phys)
+    qc_mapped = [(phys_to_sim[q], c) for q, c in qc]
+    qubits_layout_mapped = list(range(n))
+
     n_rz, data, _data_measure = sim._preprocess_circuit(
         t_qiskit_circ=t_circ,
         used_logicals=qubits_layout,
+        phys_to_sim=phys_to_sim,
     )
 
     circuit = BinaryCircuit(
@@ -136,7 +144,12 @@ def perform_test(
     )
     for chunk, flag in data:
         if flag == 0:
-            _apply_gates_on_circuit(chunk, circuit, device_param)
+            _apply_gates_on_circuit(
+                chunk,
+                circuit,
+                device_param_mapped,
+                phys_to_sim=phys_to_sim,
+            )
 
     # Todo: Check if we should make this member public.
     result = circuit._info_gates_list
@@ -146,13 +159,13 @@ def perform_test(
 
     """Result 0 """
 
-    goal0 = level_optimization(level=0, result=result, q=qubits_layout, qc=qc, n=n, psi0=psi0, sim=sim)
+    goal0 = level_optimization(level=0, result=result, q=qubits_layout_mapped, qc=qc_mapped, n=n, psi0=psi0, sim=sim)
     print("goal 0: ", goal0)
     print("")
 
     """Result 1 """
 
-    goal1 = level_optimization(level=1, result=result, q=qubits_layout, qc=qc, n=n, psi0=psi0, sim=sim)
+    goal1 = level_optimization(level=1, result=result, q=qubits_layout_mapped, qc=qc_mapped, n=n, psi0=psi0, sim=sim)
     print("goal 1: ",goal1)
     check_01 = np.abs(goal0-goal1)
     print("check 01: ", check_01)
@@ -160,7 +173,7 @@ def perform_test(
 
     """Result 2 """
 
-    goal2 = level_optimization(level=2, result=result, q=qubits_layout, qc=qc, n=n, psi0=psi0, sim=sim)
+    goal2 = level_optimization(level=2, result=result, q=qubits_layout_mapped, qc=qc_mapped, n=n, psi0=psi0, sim=sim)
     print("goal 2: ", goal2)
     check_02 = np.abs(goal0-goal2)
     print("check 02: ", check_02)
@@ -168,7 +181,7 @@ def perform_test(
 
     """Result 3 """
 
-    goal3 = level_optimization(level=3, result=result, q=qubits_layout, qc=qc, n=n, psi0=psi0, sim=sim)
+    goal3 = level_optimization(level=3, result=result, q=qubits_layout_mapped, qc=qc_mapped, n=n, psi0=psi0, sim=sim)
     print("goal 3: ", goal3)
     check_03 = np.abs(goal0-goal3)
     print("check 03: ", check_03)
@@ -176,7 +189,7 @@ def perform_test(
 
     """Result 4 """
 
-    goal4 = level_optimization(level= 4, result= result, q=qubits_layout, qc=qc, n=n, psi0=psi0, sim=sim)
+    goal4 = level_optimization(level= 4, result= result, q=qubits_layout_mapped, qc=qc_mapped, n=n, psi0=psi0, sim=sim)
     print("goal 4: ", goal4)
     check_04 = np.abs(goal0-goal4)
     print("check 04: ", check_04)
@@ -186,6 +199,45 @@ def perform_test(
     assert all((i < 10e-12 for i in check_02)), f"Results from level 0 and 2 mismatch"
     assert all((i < 10e-12 for i in check_03)), f"Results from level 0 and 3 mismatch"
     assert all((i < 10e-12 for i in check_04)), f"Results from level 0 and 4 mismatch"
+
+
+@pytest.mark.parametrize(
+    "qubits_layout,depth,seed",
+    [
+        ([2, 5], d, seed)
+        for d in [1, 2, 3]
+        for seed in [1, 2, 3]
+    ] + [
+        ([0, 7], d, seed)
+        for d in [1, 2]
+        for seed in [1, 2]
+    ]
+)
+def test_optimization_algorithm_non_contiguous_layout(qubits_layout: list, depth: int, seed: int):
+    """Optimizer levels 0-4 must agree for non-contiguous physical layouts.
+
+    The test exercises the exact scenario where physical qubits are not [0..n-1] (e.g. [2,5] or [0,7]).
+    """
+    nqubits = len(qubits_layout)
+    circ = create_random_quantum_circuit(n_qubit=nqubits, depth=depth, seed_circ=seed, measured_qubit=min(2, nqubits))
+    t_circ = transpile_qiskit_circuit(circ=circ, init_layout=qubits_layout, seed=10, backend=backend)
+
+    # Device params must cover up to max physical index
+    device_param = DeviceParameters(list(np.arange(max(qubits_layout) + 1)))
+    device_param.load_from_texts(location=location)
+    device_param = device_param.__dict__()
+
+    sim = MrAndersonSimulator(gates=standard_gates, CircuitClass=BinaryCircuit)
+    q, qc, n = sim._process_layout(circ=t_circ)
+
+    perform_test(
+        sim=sim,
+        t_circ=t_circ,
+        qc=qc,
+        qubits_layout=q,
+        n=n,
+        device_param=device_param,
+    )
 
 
 def test_opt_level_1_merging_two_1q_gates_does_not_oob():
