@@ -1,5 +1,6 @@
 """Performs simulations with the Noisy quantum gates approach.
 """
+import warnings
 import numpy as np
 import copy
 import inspect
@@ -106,16 +107,42 @@ class MrAndersonSimulator(object):
                 • **"mid_counts"** – aggregated mid-circuit measurement bitstrings.
                 • **"statevector_readout"** – measured statevectors, from mid measure.
         """
+        # Early type checks (before accessing attributes like .data or .clbits)
+        if not isinstance(t_qiskit_circ, QuantumCircuit):
+            raise ValueError(f"Expected argument t_qiskit_circ to be of type QuantumCircuit, but found {type(t_qiskit_circ)}.")
+        if not isinstance(device_param, dict):
+            raise ValueError(f"Expected argument device_param to be of type dict, but found {type(device_param)}.")
+
+        # Validate device_param keys
+        _REQUIRED_DEVICE_PARAM_KEYS = {"T1", "T2", "p", "rout", "tm", "p_int", "t_int"}
+        missing_keys = _REQUIRED_DEVICE_PARAM_KEYS - device_param.keys()
+        if missing_keys:
+            raise ValueError(
+                f"device_param is missing required keys: {sorted(missing_keys)}. "
+                f"Expected all of: {sorted(_REQUIRED_DEVICE_PARAM_KEYS)}."
+            )
+
         # Process layout circuit
         used_logicals, q_meas_list, n_qubit_used = self._process_layout(t_qiskit_circ)
-        
+
         # Get total classical bits (for Aer-style output)
         num_clbits = len(t_qiskit_circ.clbits)
-        
+
         # Infer width from psi0 (must be power of two)
-        nqubit = int(round(np.log2(psi0.size)))
-        if 2**nqubit != psi0.size:
+        nqubit_from_psi0 = int(round(np.log2(psi0.size)))
+        if 2**nqubit_from_psi0 != psi0.size:
             raise ValueError(f"psi0 length {psi0.size} is not a power of two.")
+
+        # Warn if user-supplied nqubit disagrees with psi0
+        if nqubit is not None and nqubit != nqubit_from_psi0:
+            warnings.warn(
+                f"nqubit={nqubit} does not match psi0 size ({psi0.size} → "
+                f"{nqubit_from_psi0} qubits). Using {nqubit_from_psi0} "
+                f"(inferred from psi0).",
+                UserWarning,
+                stacklevel=2,
+            )
+        nqubit = nqubit_from_psi0
 
         # strong validation against the FULL layout (not the used subset)
         self._validate_input_of_run(t_qiskit_circ, psi0, shots, device_param, nqubit)
