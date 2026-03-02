@@ -157,8 +157,8 @@ class RotatedSurfaceCode:
                 for k in range(half):
                     stab_z.append((r, index)); 
                     neighbor = []
+                    neighbor.append(index + factor  + index_neighbor + 1)
                     neighbor.append(index + factor  + index_neighbor )
-                    neighbor.append(index + factor + 1  + index_neighbor )
                     neighbors[index] = neighbor
                     index_neighbor += 1
                     index += 1
@@ -186,10 +186,10 @@ class RotatedSurfaceCode:
                                 neighbors[index] = neighbor
                             else:
                                 neighbor = []
-                                neighbor.append(index - d -1)
                                 neighbor.append(index - d )
-                                neighbor.append(index + d -1)
+                                neighbor.append(index - d -1)
                                 neighbor.append(index + d )
+                                neighbor.append(index + d -1)
                                 neighbors[index] = neighbor
 
                         else: 
@@ -200,26 +200,26 @@ class RotatedSurfaceCode:
                                 neighbors[index] = neighbor
                             else:
                                 neighbor = []
-                                neighbor.append(index - d )
-                                neighbor.append(index - d +1)
-                                neighbor.append(index + d )
-                                neighbor.append(index + d +1)
+                                neighbor.append(index - d +1 )
+                                neighbor.append(index - d)
+                                neighbor.append(index + d + 1 )
+                                neighbor.append(index + d)
                                 neighbors[index] = neighbor
                     else:
                         stab_z.append((r, index))
                         if r % 4 == 2:
                             neighbor = []
-                            neighbor.append(index - d -1)
                             neighbor.append(index - d )
-                            neighbor.append(index + d -1)
+                            neighbor.append(index - d -1)
                             neighbor.append(index + d )
+                            neighbor.append(index + d -1 )
                             neighbors[index] = neighbor
                         else: 
                             neighbor = []
-                            neighbor.append(index - d)
-                            neighbor.append(index - d +1)
-                            neighbor.append(index + d)
+                            neighbor.append(index - d+1)
+                            neighbor.append(index - d )
                             neighbor.append(index + d +1)
+                            neighbor.append(index + d )
                             neighbors[index] = neighbor
                     index += 1
                 continue
@@ -261,6 +261,7 @@ class RotatedSurfaceCode:
                 neighbor = self.neighbors[anc]
                 for nb in neighbor:
                     self.qc.cx(anc, nb)
+                    self.qc.barrier()
 
                 self.qc.barrier()
                 self.qc.h(anc)  # rotate back before measurement
@@ -272,6 +273,7 @@ class RotatedSurfaceCode:
                 neighbor = self.neighbors[anc]
                 for nb in neighbor:
                     self.qc.cx(nb, anc)
+                    self.qc.barrier()
 
                 self.qc.barrier()
             
@@ -387,11 +389,9 @@ class RotatedSurfaceCode:
         if noise:
             custom_channel_gates = CustomNoiseChannelsGates(
             noiseless_qubits=stabilizer_indices,  # qubits with no noise channels
-            scale = False, # take device parameters as is
             p_scale=p_scale,
             T1_scale=T1_scale,
-            T2_scale=T2_scale,
-            )
+            T2_scale=T2_scale, )
             set_gate = custom_channel_gates
             bit_flip_bool = True
         else:
