@@ -10,7 +10,8 @@ from ._utility.simulations_utility import (
     post_process_split,
     compute_Hellinger_distance as hellinger_distance,
     create_random_quantum_circuit,
-    transpile_qiskit_circuit
+    transpile_qiskit_circuit,
+    pretty_print_data
 )
 
 from ._utility.circ_optimizer import Optimizer

@@ -1263,10 +1263,8 @@ class BinaryCircuit(object):
         if phase_reset: 
             self.phi = [0 for i in range(self.nqubit)]
             
-        self._s = 0
         self._backend = self._BackendClass(self.nqubit)
-        self._mp = [1 for i in range(self.nqubit)]
-        self._mp_list = []
+        self._info_gates_list = []
 
 
 class StandardCircuit(AlternativeCircuit):

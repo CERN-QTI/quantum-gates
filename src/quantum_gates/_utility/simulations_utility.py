@@ -269,3 +269,39 @@ def transpile_qiskit_circuit(circ : QuantumCircuit, init_layout: list, seed: int
         )
 
         return t_circ
+
+
+def pretty_print_data(data):
+        """Print human-readable view of preprocessed circuit data.
+        
+            Args:
+                data: list of CircuitInstruction from a circuit. 
+        """
+        for idx, (chunk, flag) in enumerate(data):
+            if flag == 0:
+                ops_str = " , ".join(
+                    f"{op.operation.name}[{', '.join(str(q._index) for q in op.qubits)}]"
+                    for op in chunk
+                )
+                print(f"Chunk {idx}: {ops_str}")
+            else:
+                op = chunk
+                # handle mid_measurement tuple
+                if isinstance(op, tuple) and op[0] == "mid_measurement":
+                    meas_op = op[1]
+                    q_idx = meas_op["q_idx"]
+                    c_idx = meas_op["c_idx"]
+                    print(f"Fancy {idx}: mid_measurement qubits={q_idx} clbits={c_idx}")
+                    
+                elif isinstance(op, tuple) and op[0] == "reset_qubits":
+                    meas_op = op[1]
+                    q_idx = meas_op["q_idx"]
+                    print(f"Fancy {idx}: reset_qubits qubits={q_idx}")
+                    
+                else:
+                    # normal fancy gate (Instruction)
+                    print(
+                        f"Fancy {idx}: {op.operation.name} "
+                        f"qubits={[q._index for q in op.qubits]} "
+                        f"clbits={[c._index for c in op.clbits]}"
+                    )
