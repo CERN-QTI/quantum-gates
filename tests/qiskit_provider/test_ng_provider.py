@@ -10,7 +10,6 @@ from qiskit_ibm_runtime.fake_provider import FakeProviderForBackendV2
 from qiskit.circuit.random import random_circuit
 from qiskit_ibm_runtime.fake_provider import FakeKyiv
 
-
 from src.quantum_gates.qiskit_provider import NoisyGatesProvider
 
 

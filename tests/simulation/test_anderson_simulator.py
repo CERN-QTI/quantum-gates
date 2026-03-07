@@ -3,12 +3,11 @@ import time
 
 import numpy as np
 
-from configuration.token import IBM_TOKEN, HUB, GROUP, PROJECT, CRN
 from src.quantum_gates.quantum_algorithms import hadamard_reverse_qft_circ
 from src.quantum_gates.utilities import setup_backend, create_qc_list
 from src.quantum_gates.simulators import MrAndersonSimulator
 from src.quantum_gates.circuits import EfficientCircuit
-from src.quantum_gates._simulation.circuit import Circuit, StandardCircuit, OneCircuit, BinaryCircuit
+from src.quantum_gates.circuits import Circuit, StandardCircuit, OneCircuit, BinaryCircuit
 from src.quantum_gates.gates import standard_gates, noise_free_gates
 from src.quantum_gates._gates.gates import numerical_gates, almost_noise_free_gates
 from src.quantum_gates.utilities import DeviceParameters

@@ -2,7 +2,6 @@
 This module implements the base class to perform noisy quantum simulations with noisy gates approach
 """
 import numpy as np
-import itertools
 import functools as ft
 
 from .._gates.gates import Gates

@@ -6,12 +6,10 @@ import concurrent.futures
 
 from qiskit import transpile, QuantumCircuit
 from qiskit_aer import AerSimulator
-from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit.circuit.random import random_circuit
 from qiskit.providers.backend import BackendV2 as Backend
 from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit_ibm_runtime.fake_provider.fake_backend import FakeBackendV2
-
 
 
 def fix_counts(counts_0: dict, n_qubits: int) -> dict:
@@ -274,8 +272,8 @@ def transpile_qiskit_circuit(circ : QuantumCircuit, init_layout: list, seed: int
 def pretty_print_data(data):
         """Print human-readable view of preprocessed circuit data.
         
-            Args:
-                data: list of CircuitInstruction from a circuit. 
+        Args:
+            data: list of CircuitInstruction from a circuit.
         """
         for idx, (chunk, flag) in enumerate(data):
             if flag == 0:
@@ -286,7 +284,7 @@ def pretty_print_data(data):
                 print(f"Chunk {idx}: {ops_str}")
             else:
                 op = chunk
-                # handle mid_measurement tuple
+                # Handle mid_measurement tuple
                 if isinstance(op, tuple) and op[0] == "mid_measurement":
                     meas_op = op[1]
                     q_idx = meas_op["q_idx"]
@@ -299,7 +297,7 @@ def pretty_print_data(data):
                     print(f"Fancy {idx}: reset_qubits qubits={q_idx}")
                     
                 else:
-                    # normal fancy gate (Instruction)
+                    # Normal fancy gate (Instruction)
                     print(
                         f"Fancy {idx}: {op.operation.name} "
                         f"qubits={[q._index for q in op.qubits]} "

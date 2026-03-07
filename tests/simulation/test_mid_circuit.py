@@ -6,9 +6,9 @@ from qiskit_ibm_runtime.fake_provider import FakeBrisbane
 
 from src.quantum_gates.simulators import MrAndersonSimulator
 from src.quantum_gates.circuits import EfficientCircuit
-from src.quantum_gates._simulation.circuit import BinaryCircuit
+from src.quantum_gates.circuits import BinaryCircuit
 from src.quantum_gates.gates import standard_gates
-from src.quantum_gates._gates.gates import almost_noise_free_gates
+from src.quantum_gates.gates import almost_noise_free_gates
 from src.quantum_gates.utilities import DeviceParameters
 from src.quantum_gates.quantum_algorithms import hadamard_reverse_qft_circ
 
@@ -69,12 +69,16 @@ def _run_sim(t_circ, nqubits, gates, circuit_class, shots=100):
     (3, BinaryCircuit),
 ])
 def test_identity_zero_noise(nqubits, circuit_class):
-    """hadamard_reverse_qft_circ is an identity circuit.
-    With noise-free gates the result must be |0...0> with probability ~1."""
+    """Apply the non-trivial identity circuit (hadamard plus reverse qft circ) with noise-free gates and check that
+    the result is |0...0> with probability ~1."""
+    # Arrange
     circ = hadamard_reverse_qft_circ(nqubits)
     t_circ = _transpile_standard(circ, nqubits)
+
+    # Act
     result = _run_sim(t_circ, nqubits, almost_noise_free_gates, circuit_class, shots=10)
 
+    # Assert
     probs = result["probs"]
     zero_state = "0" * nqubits
     p_zero = probs.get(zero_state, 0.0)
@@ -112,7 +116,7 @@ def test_mid_measure_ghz_produces_mid_counts(nqubits):
     result = _run_sim(t_circ, nqubits, almost_noise_free_gates, BinaryCircuit, shots=500)
 
     # Assert
-    # Mid counts should be non-empty (measurements happened)
+    # Mid counts should be non-empty, demonstrating that a measurement happened
     assert len(result["mid_counts"]) > 0, "Expected mid-circuit measurement counts"
     assert len(result["results"]) == 500
 
