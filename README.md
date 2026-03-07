@@ -253,12 +253,57 @@ python -m pytest -k test_gates_noiseless_cnot_inv
 ```
 
 # How to contribute
-Contributions are welcomed and should apply the usual git-flow: fork this repo, create a local branch named 
-'feature-...'. Commit often to ensure that each commit is easy to understand. Name your commits 
-'[feature-...] Commit message.', such that it possible to differentiate the commits of different features in the 
-main line. Request a merge to the mainline often. Contribute to the test suite and verify the functionality with the unit tests when using a different Python version or dependency versions. Please remember to follow the 
-[PEP 8 style guide](https://peps.python.org/pep-0008/), and add comments whenever it helps. You can run the linter
-with `pylint .`. The corresponding [authors](<#authors>) are happy to support you. 
+Contributions are welcomed and should apply the usual git-flow: fork this repo and create a local branch. Commit often 
+to ensure that each commit is easy to understand. Request a merge to the mainline often. Contribute to the test suite 
+and verify the functionality with the unit tests when using a different Python version or dependency versions. 
+Please remember to follow the [PEP 8 style guide](https://peps.python.org/pep-0008/), and add comments whenever it helps. 
+The corresponding [authors](<#authors>) are happy to support you.
+
+## Contribution guidelines
+
+### Branching and commits
+- Create feature branches from `main` named `feature/<description>` (e.g. `feature/mid-circuit-measurement`).
+- Keep pull requests small and focused. A PR that touches one feature or fix is easier to review and less likely to
+  introduce regressions. If your work spans multiple concerns, split it into separate PRs.
+- Commit often with clear messages prefixed by the branch name, e.g. `[xyz] Added mid-measurement support`.
+- Each commit should be self-contained and leave the codebase in a working state.
+
+### Writing Tests
+- Every new feature or bug fix should include corresponding unit tests.
+- Tests serve a dual purpose: they verify correctness and document behaviour. A reviewer should be able to
+  understand what a feature does by reading its tests.
+- Place tests in the appropriate subdirectory under `tests/` (`simulation/`, `utility/`, `gates/`, `qiskit_provider/`). 
+  The test location should mirror the structure of src/. For example, changes in src/gates/pulse.py should be 
+  accompanied by tests in tests/gates/test_pulse.py.
+- Use `pytest` parametrize to cover multiple configurations (qubit counts, circuit types, noise levels) without
+  duplicating test logic.
+- When testing against Qiskit's AER simulator, compare statevectors or measurement distributions to validate
+  correctness (see `tests/simulation/test_mid_circuit.py` for examples).
+
+### Pull Request Process
+
+PRs are reviewed with three goals in mind:
+
+1. Functional correctness: Does the code work as intended? Are edge cases handled? Do all tests pass?
+2. Code quality: Does the change maintain or improve the codebase? Is there unnecessary duplication, dead code,
+   or unclear naming? PRs should leave the code at least as clean as they found it to avoid accumulating technical debt.
+3. Knowledge sharing: Reviews are didactical. Reviewers should explain why a change is requested. Authors should add 
+   comments where the logic is non-obvious.
+
+PR checklist for authors:
+- [ ] All existing tests pass (`python -m pytest`).
+- [ ] New tests are added for new functionality.
+- [ ] Code follows PEP 8 convention whenever possible.
+- [ ] No secrets, tokens, or large binary files are committed.
+- [ ] The PR description explains what changed and why.
+- [ ] If the change affects the public API, update the docstrings and README examples.
+
+PR checklist for reviewers:
+- [ ] Read the PR description and understand the motivation.
+- [ ] Run the tests locally to confirm they pass.
+- [ ] Check that new code has test coverage.
+- [ ] Look for potential regressions, performance issues, and code clarity.
+- [ ] Leave constructive comments and suggest concrete alternatives when requesting changes.
 
 
 ## Build 
@@ -340,4 +385,6 @@ This project has been developed thanks to the effort of the following people:
 * Sandro Donadi
 * Angelo Bassi 
 * Paolo Da Rold 
+* Cherilyn Christen
+* Nathan Pacey
 * Roman Wixinger (roman.wixinger@gmail.com)
