@@ -302,3 +302,134 @@ def test_repetition_code_zero_noise(n_cycles):
     assert total_prob_zero_data > 0.90, (
         f"Expected data qubits to remain |0...0> but got P={total_prob_zero_data:.4f}"
     )
+
+
+# Transpiler permutation tests
+# The Qiskit transpiler may insert SWAP gates when a circuit uses non-adjacent qubits, which permutes the qubit
+# ordering in the statevector. These tests verify that our simulator still produces correct measurement probabilities
+# despite such permutations.
+@pytest.mark.parametrize("circuit_class", [EfficientCircuit, BinaryCircuit])
+def test_transpiler_permutation_deterministic_state(circuit_class):
+    """CX(0,2) forces the transpiler to route through qubit 1 on a linear
+    topology.  The circuit prepares |101> deterministically. Verify the
+    simulator produces one dominant outcome despite qubit permutations."""
+    # Arrange: X(0), CX(0,2) -> |101>  (q0 and q2 are not adjacent)
+    nqubits = 3
+    circ = QuantumCircuit(3, 3)
+    circ.x(0)
+    circ.cx(0, 2)
+    circ.barrier()
+    circ.measure([0, 1, 2], [0, 1, 2])
+
+    t_circ = _transpile_standard(circ, nqubits)
+
+    # Act
+    result = _run_sim(t_circ, nqubits, almost_noise_free_gates, circuit_class, shots=100)
+    probs = result["probs"]
+
+    # Assert: |101> is prepared with high fidelity
+    assert probs['101'] > 0.95, (
+        f"Expected |101> to be prepared with p>0.95 after transpiler routing "
+        f"but got probs={probs}"
+    )
+
+
+@pytest.mark.parametrize("circuit_class", [EfficientCircuit, BinaryCircuit])
+def test_transpiler_permutation_bell_state(circuit_class):
+    """H(0)+CX(0,2) creates a Bell-like state between non-adjacent qubits,
+    forcing the transpiler to route through qubit 1. The final measurement
+    should show roughly 50/50 between two states."""
+    # Arrange
+    nqubits = 3
+    circ = QuantumCircuit(3, 3)
+    circ.h(0)
+    circ.cx(0, 2)
+    circ.barrier()
+    circ.measure([0, 1, 2], [0, 1, 2])
+
+    t_circ = _transpile_standard(circ, nqubits)
+
+    # Act
+    result = _run_sim(t_circ, nqubits, almost_noise_free_gates, circuit_class, shots=500)
+    probs = result["probs"]
+
+    # Assert: two dominant states should share ~1.0 probability
+    sorted_probs = sorted(probs.values(), reverse=True)
+    top_two_sum = sorted_probs[0] + sorted_probs[1]
+    assert top_two_sum > 0.95, (
+        f"Expected two dominant states summing to >0.95 but got {top_two_sum:.4f}"
+    )
+    # Each should be roughly 0.5
+    assert 0.30 < sorted_probs[0] < 0.70, (
+        f"Expected ~50% but dominant state has P={sorted_probs[0]:.4f}"
+    )
+
+
+def test_transpiler_permutation_mid_circuit_deterministic():
+    """When a circuit forces routing (CX on non-adjacent qubits) and has mid-circuit measurements, verify that
+    mid-circuit outcomes are correct despite qubit permutations.
+
+    Circuit: X(0), CX(0,2) -> |101>, then mid-measure q0. Expected: mid-measure of q0 should always be 1.
+    """
+    # Arrange
+    nqubits = 3
+    n_clbits = nqubits + 1
+    circ = QuantumCircuit(nqubits, n_clbits)
+    circ.x(0)
+    circ.cx(0, 2)
+    circ.measure(0, nqubits)   # Mid-measure q0 to extra clbit
+    circ.rz(0.001, 0)          # Keep it mid-circuit
+    circ.barrier()
+    circ.measure(range(nqubits), range(nqubits))
+
+    t_circ = _transpile_midcircuit(circ, nqubits)
+
+    # Act
+    result = _run_sim(t_circ, nqubits, almost_noise_free_gates, BinaryCircuit, shots=100)
+
+    # Assert: all mid-circuit outcomes should be 1 (q0 was prepared with X)
+    for shot in result["results"]:
+        for event in shot["mid"]:
+            for o in event["outcome"]:
+                assert int(o) == 1, (
+                    f"Expected mid-measure outcome 1 for X-prepared qubit "
+                    f"but got {o}"
+                )
+
+
+def test_mid_circuit_output_clbit_width():
+    """Documents that mid_counts keys have num_clbits characters (total classical bits) while probs keys have nqubit
+    characters (state vector width).
+
+    Context: A contributor observed that simulating 3 qubits produced output strings like '0000' (4 chars). This happens
+    because the circuit has 4 classical bits (3 for final measurement + 1 for mid-circuit measurement). The extra
+    character is the mid-circuit classical bit, not an extra qubit.
+    """
+    # Arrange
+    nqubits = 3
+    n_clbits = nqubits + 1
+    circ = QuantumCircuit(nqubits, n_clbits)
+    circ.measure(0, nqubits)
+    circ.rz(0.001, 0)
+    circ.barrier()
+    circ.measure(range(nqubits), range(nqubits))
+
+    t_circ = _transpile_midcircuit(circ, nqubits)
+
+    # Act
+    result = _run_sim(t_circ, nqubits, almost_noise_free_gates, BinaryCircuit, shots=50)
+
+    # Assert: probs keys should have nqubit characters
+    for key in result["probs"]:
+        assert len(key) == nqubits, (
+            f"Expected probs key length {nqubits} but got '{key}' (len={len(key)})"
+        )
+
+    # Assert: mid_counts keys should have num_clbits characters
+    assert result["num_clbits"] == n_clbits
+    for key in result["mid_counts"]:
+        assert len(key) == n_clbits, (
+            f"Expected mid_counts key length {n_clbits} but got '{key}' "
+            f"(len={len(key)}). The extra character comes from the additional "
+            f"classical bit used for mid-circuit measurement, not an extra qubit."
+        )
