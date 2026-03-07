@@ -19,7 +19,7 @@ location = "tests/helpers/device_parameters/ibm_kyoto/"
 backend = setup_backend(device_name=FakeBrisbane(), use_fake=True)
 
 
-def level_optimization(level: int, result: list, q: list, qc: list, n: int, psi0: np.array, sim: MrAndersonSimulator):
+def level_optimization(level: int, result: list, q: list, qc: list, n: int, psi0: np.array, sim: MrAndersonSimulator, qubits_layout: list[int]):
     bb = BinaryBackend(n)
     opt = Optimizer(level_opt=level, circ_list=result, qubit_list=q)
     result = opt.optimize()
@@ -50,7 +50,7 @@ def level_optimization(level: int, result: list, q: list, qc: list, n: int, psi0
             psi0 = U.dot(psi0)
 
     probs = np.square(np.absolute(psi0))
-    sums = sim._measurement(prob=probs, q_meas_list=qc, n_qubit=n)
+    sums = sim._measurement(prob=probs, q_meas_list=qc, n_qubit=n, qubits_layout=qubits_layout)
     goal = dict(fix_counts(sums, len(qc)))
     goal_list = np.array([value for key, value in goal.items()])
 
@@ -120,7 +120,7 @@ def perform_test(
         t_circ: QuantumCircuit,
         qc: list,
         qubits_layout: list, n: int,
-        device_param: DeviceParameters):
+        device_param: dict):
 
     print(f"qubits_layout: {qubits_layout}, qc: {qc}, n: {n}")
 
@@ -137,7 +137,7 @@ def perform_test(
     )
     for chunk, flag in data:
         if flag == 0:
-            _apply_gates_on_circuit(chunk, circuit, device_param)
+            _apply_gates_on_circuit(chunk, circuit, device_param, qubit_layout=qubits_layout)
 
     # Todo: Check if we should make this member public.
     result = circuit._info_gates_list
@@ -147,13 +147,13 @@ def perform_test(
 
     """Result 0 """
 
-    goal0 = level_optimization(level=0, result=result, q=qubits_layout, qc=qc, n=n, psi0=psi0, sim=sim)
+    goal0 = level_optimization(level=0, result=result, q=qubits_layout, qc=qc, n=n, psi0=psi0, sim=sim, qubits_layout=qubits_layout)
     print("goal 0: ", goal0)
     print("")
 
     """Result 1 """
 
-    goal1 = level_optimization(level=1, result=result, q=qubits_layout, qc=qc, n=n, psi0=psi0, sim=sim)
+    goal1 = level_optimization(level=1, result=result, q=qubits_layout, qc=qc, n=n, psi0=psi0, sim=sim, qubits_layout=qubits_layout)
     print("goal 1: ",goal1)
     check_01 = np.abs(goal0-goal1)
     print("check 01: ", check_01)
@@ -161,7 +161,7 @@ def perform_test(
 
     """Result 2 """
 
-    goal2 = level_optimization(level=2, result=result, q=qubits_layout, qc=qc, n=n, psi0=psi0, sim=sim)
+    goal2 = level_optimization(level=2, result=result, q=qubits_layout, qc=qc, n=n, psi0=psi0, sim=sim, qubits_layout=qubits_layout)
     print("goal 2: ", goal2)
     check_02 = np.abs(goal0-goal2)
     print("check 02: ", check_02)
@@ -169,7 +169,7 @@ def perform_test(
 
     """Result 3 """
 
-    goal3 = level_optimization(level=3, result=result, q=qubits_layout, qc=qc, n=n, psi0=psi0, sim=sim)
+    goal3 = level_optimization(level=3, result=result, q=qubits_layout, qc=qc, n=n, psi0=psi0, sim=sim, qubits_layout=qubits_layout)
     print("goal 3: ", goal3)
     check_03 = np.abs(goal0-goal3)
     print("check 03: ", check_03)
@@ -177,7 +177,7 @@ def perform_test(
 
     """Result 4 """
 
-    goal4 = level_optimization(level= 4, result= result, q=qubits_layout, qc=qc, n=n, psi0=psi0, sim=sim)
+    goal4 = level_optimization(level= 4, result= result, q=qubits_layout, qc=qc, n=n, psi0=psi0, sim=sim, qubits_layout=qubits_layout)
     print("goal 4: ", goal4)
     check_04 = np.abs(goal0-goal4)
     print("check 04: ", check_04)
