@@ -137,7 +137,7 @@ class Circuit(object):
             device_param["dt"][0],
         )
 
-        # --- qubit_list validation ---
+        # Input validation for qubit list
         if qubit_list is None:
             raise ValueError("qubit_list must be specified for mid-measurement (no implicit 'measure all').")
         if not isinstance(qubit_list, (list, tuple)) or len(qubit_list) == 0:
@@ -147,7 +147,7 @@ class Circuit(object):
         if len(set(qubit_list)) != len(qubit_list):
             raise ValueError("qubit_list contains duplicate indices.")
 
-        # --- cbit_list validation (optional) ---
+        # Input validation for cbit_list validation
         write_cb = cbit_list is not None
         if write_cb:
             if not isinstance(cbit_list, (list, tuple)):
@@ -159,15 +159,14 @@ class Circuit(object):
             if len(set(cbit_list)) != len(cbit_list):
                 raise ValueError("cbit_list contains duplicate indices.")
 
-        # --- perform measurements sequentially (collapse after each) ---
+        # Perform measurements sequentially, collapse after each
         psi = psi0.copy() # copy input psi0 to avoid modifying it
         outcomes_in_q_order: list[int] = [] 
         cbit_results = {}  # only used if write_cb is True
         
-        # loop over qubits to measure sequentially
+        # Loop over qubits to measure sequentially
         for target_qubit_idx, target_qubit in enumerate(qubit_list):
-            # optional bitflip noise before measurement
-            if add_bitflip: 
+            if add_bitflip:
                 self.reset(phase_reset=False)
                 self.bitflip(i=target_qubit, tm=tm[target_qubit], rout=rout[target_qubit])
                 psi = self.statevector(psi)
@@ -175,26 +174,26 @@ class Circuit(object):
 
             # Born probabilities (big-endian: qubit 0 = most significant)
             p0 = 0.0
-            # compute probability of measuring 0 on target_qubit
+            # Compute probability of measuring 0 on target_qubit
             for idx, amp in enumerate(psi):
                 bit = (idx >> (n - 1 - target_qubit)) & 1
                 if bit == 0:
                     p0 += (amp.real * amp.real + amp.imag * amp.imag)
             p1 = 1.0 - p0
-            # numerical guard 
+            # Numerical guard
             if p0 < 0.0: p0 = 0.0
             if p1 < 0.0: p1 = 0.0
             
             s = p0 + p1
-            # sampling outcome if probabilities are well-defined
+            # Sampling outcome if probabilities are well-defined
             if s == 0.0: 
                 # fully zero (shouldn't happen), keep psi as-is and pick 0 deterministically
                 outcome = 0
-            # normal case
+            # Normal case
             else:
                 p0 /= s; p1 /= s
                 outcome = np.random.choice([0, 1], p=[p0, p1])
-            # record outcome in qubit order
+            # Record outcome in qubit order
             outcomes_in_q_order.append(outcome)
 
             # Collapse on outcome onto psi
@@ -207,7 +206,7 @@ class Circuit(object):
             norm = np.linalg.norm(psi)
             if norm > 0.0:
                 psi /= norm
-            
+
             # Optionally record to classical bit mapping
             if write_cb:
                 cbit_idx = cbit_list[target_qubit_idx]
@@ -219,7 +218,7 @@ class Circuit(object):
         if write_cb:
             # preserve provided order (no sorting surprises)
             result = [cbit_results[c] for c in cbit_list]
-            
+
         else:
             result = outcomes_in_q_order
 

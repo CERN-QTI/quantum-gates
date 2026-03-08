@@ -296,7 +296,7 @@ def test_simulator_speed_for_different_circuits(nqubits, times):
 
 @pytest.mark.parametrize(
     "nqubits, times",
-    [(nqubits, times) for nqubits in range(2, 5) for times in [2]]
+    [(nqubits, times) for nqubits in range(4, 6) for times in [2]]
 )
 def test_simulator_speed_for_more_efficient_circuits(nqubits, times):
     """ Measures the time the simulation needs for the more efficient circuit, namely the EfficientCircuit and the

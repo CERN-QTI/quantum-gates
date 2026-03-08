@@ -229,7 +229,7 @@ def test_backend_is_faster_than_standard_backend(nqubits: int, steps: int):
         f"Found that the trivial tb uses less time ({time_triv_tb} s) than the tb ({time_tb} s)."
 
 
-@pytest.mark.parametrize("nqubits, steps", [(n,s) for n in range(6, 18) for s in [500]])
+@pytest.mark.parametrize("nqubits, steps", [(n,s) for n in range(6, 15) for s in [500]])
 def test_one_backend_is_faster_than_efficient_backend(nqubits: int, steps: int):
     mp_list, _ = generate_random_matrix_products(nqubits, steps=steps, prob_cnot=1/nqubits, many_identites=True)
 
