@@ -18,6 +18,15 @@ _location = "tests/helpers/device_parameters/ibm_kyoto/"
 _LAYOUT = [0, 1, 2, 3, 4]
 
 
+def _meas_map(circ):
+    """Return {physical_qubit: classical_bit} for every measure op in circ."""
+    return {
+        op.qubits[0]._index: circ.find_bit(op.clbits[0]).index
+        for op in circ.data
+        if op.operation.name == "measure"
+    }
+
+
 def _device_param(nqubits):
     """Load device parameters for a linear layout of nqubits."""
     dp = DeviceParameters(qubits_layout=_LAYOUT[:nqubits])
@@ -271,7 +280,7 @@ def _repetition_code_circuit(n_data=3, n_cycles=3):
 @pytest.mark.parametrize("n_cycles", [1, 3, 5])
 def test_repetition_code_zero_noise(n_cycles):
     """In zero noise, all syndrome measurements should be 0 and data qubits
-    should remain |0...0> after repeated measure+reset cycles."""
+    should remain |0...0> after repeated measure and reset cycles."""
     # Arrange
     n_data = 3
     circ, n_total = _repetition_code_circuit(n_data=n_data, n_cycles=n_cycles)
@@ -305,15 +314,46 @@ def test_repetition_code_zero_noise(n_cycles):
 
 
 # Transpiler permutation tests
+# See https://github.com/Qiskit/qiskit/issues/5839 and AER_testing_statevector.ipynb
 # The Qiskit transpiler may insert SWAP gates when a circuit uses non-adjacent qubits, which permutes the qubit
 # ordering in the statevector. These tests verify that our simulator still produces correct measurement probabilities
 # despite such permutations.
+def test_transpiler_routing_structure_and_measurement_map():
+    """Directly inspect what the transpiler does to CX(0,2) on a linear
+    topology and verify the simulator accounts for it.
+
+    CX(0,2) is not natively supported, 0 and 2 are not adjacent on FakeBrisbane.
+    The transpiler decomposes it into adjacent ECR gates, which:
+      1. Adds many more gates than the original two (X and CX).
+      2. Permutes the measurement map: instead of {0:0, 1:1, 2:2} the
+         transpiler emits q0->c0, q2->c1, q1->c2  with qubits 1 and 2 swapped.
+
+    The simulator reads this permuted map from the transpiled circuit and
+    produces the correct logical output '101' (q0=1, q1=0, q2=1).
+    """
+    nqubits = 3
+    circ = QuantumCircuit(3, 3)
+    circ.x(0)
+    circ.cx(0, 2)
+    circ.barrier()
+    circ.measure([0, 1, 2], [0, 1, 2])
+
+    t_circ = _transpile_standard(circ, nqubits)
+
+    # Routing inserted extra gates: original has 2 (X and CX), transpiled has many more
+    routed = [op for op in t_circ.data if op.operation.name not in {"barrier", "delay", "measure"}]
+    assert len(routed) > 2, f"Expected routing to insert extra gates but got {len(routed)}"
+
+    # Measurement map is permuted to account for the SWAP: q1 and q2 exchanged
+    assert _meas_map(t_circ) == {0: 0, 2: 1, 1: 2}, f"Unexpected measurement map: {_meas_map(t_circ)}"
+
+
 @pytest.mark.parametrize("circuit_class", [EfficientCircuit, BinaryCircuit])
 def test_transpiler_permutation_deterministic_state(circuit_class):
     """CX(0,2) forces the transpiler to route through qubit 1 on a linear
     topology.  The circuit prepares |101> deterministically. Verify the
     simulator produces one dominant outcome despite qubit permutations."""
-    # Arrange: X(0), CX(0,2) -> |101>  (q0 and q2 are not adjacent)
+    # Arrange: X(0), CX(0,2) -> |101>  with q0 and q2 two non-adjacent qubits
     nqubits = 3
     circ = QuantumCircuit(3, 3)
     circ.x(0)
@@ -336,7 +376,7 @@ def test_transpiler_permutation_deterministic_state(circuit_class):
 
 @pytest.mark.parametrize("circuit_class", [EfficientCircuit, BinaryCircuit])
 def test_transpiler_permutation_bell_state(circuit_class):
-    """H(0)+CX(0,2) creates a Bell-like state between non-adjacent qubits,
+    """H(0) and CX(0,2) creates a Bell-like state between non-adjacent qubits,
     forcing the transpiler to route through qubit 1. The final measurement
     should show roughly 50/50 between two states."""
     # Arrange
@@ -378,7 +418,7 @@ def test_transpiler_permutation_mid_circuit_deterministic():
     circ.x(0)
     circ.cx(0, 2)
     circ.measure(0, nqubits)   # Mid-measure q0 to extra clbit
-    circ.rz(0.001, 0)          # Keep it mid-circuit
+    circ.rz(0.001, 0)      # Keep it mid-circuit
     circ.barrier()
     circ.measure(range(nqubits), range(nqubits))
 
@@ -387,7 +427,7 @@ def test_transpiler_permutation_mid_circuit_deterministic():
     # Act
     result = _run_sim(t_circ, nqubits, almost_noise_free_gates, BinaryCircuit, shots=100)
 
-    # Assert: all mid-circuit outcomes should be 1 (q0 was prepared with X)
+    # Assert: all mid-circuit outcomes should be 1, q0 was prepared with X
     for shot in result["results"]:
         for event in shot["mid"]:
             for o in event["outcome"]:
