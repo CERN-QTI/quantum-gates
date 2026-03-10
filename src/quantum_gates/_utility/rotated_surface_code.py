@@ -410,7 +410,11 @@ class RotatedSurfaceCode:
         t_circ = RotatedSurfaceCode.transpile_circ(self.qc, self.n_qubits)
 
         if self.aer and self.transpile:
-            return t_circ
+            init_circuit = QuantumCircuit(self.n_qubits)
+            init_circuit.set_statevector(self.initial_state)  # sets simulator state directly
+
+            t_circ_final = init_circuit.compose(t_circ)
+            return t_circ_final
 
             
         device_param_lookup = self._get_device_parameters(backend)
