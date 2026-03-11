@@ -5,9 +5,7 @@ import pytest
 import numpy as np
 
 from src.quantum_gates._legacy.gates import X, SX, Noise_Gate, CR, CNOT, CNOT_inv, ECR, ECR_inv
-from src.quantum_gates.gates import standard_gates, noise_free_gates
-from src.quantum_gates._gates.gates import numerical_gates, almost_noise_free_gates
-from src.quantum_gates.gates import Gates
+from src.quantum_gates.gates import standard_gates, noise_free_gates, numerical_gates, almost_noise_free_gates, Gates
 from src.quantum_gates.pulses import GaussianPulse
 import tests.helpers.device_parameters as helper_dev_param
 

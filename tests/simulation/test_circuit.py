@@ -1,10 +1,8 @@
 import pytest
 import numpy as np
 
-from src.quantum_gates.circuits import EfficientCircuit
-from src.quantum_gates._simulation.circuit import Circuit, AlternativeCircuit, StandardCircuit, BinaryCircuit
-from src.quantum_gates.backends import EfficientBackend
-from src.quantum_gates._simulation.backend import StandardBackend
+from src.quantum_gates.circuits import EfficientCircuit, Circuit, AlternativeCircuit, StandardCircuit, BinaryCircuit
+from src.quantum_gates.backends import EfficientBackend, StandardBackend
 from src.quantum_gates.gates import standard_gates
 import tests.helpers.gates as helper_gates
 import tests.helpers.functions as helper_functions

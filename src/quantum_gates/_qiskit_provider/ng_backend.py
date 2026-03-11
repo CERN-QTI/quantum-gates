@@ -81,9 +81,9 @@ class NoisyGatesBackend(Backend):
             seed_simulator=None
         )
     
-    def set_gates_ng(self, gate : Gates) -> Gates:
+    def set_gates_ng(self, gate : Gates) -> bool:
         return self.gates_ng == gate
-    
+
     def set_circuit_class_ng(self, circuit_class : str):
         if circuit_class == 'EfficientCircuit':
             self.circuit_class_ng = EfficientCircuit
@@ -224,8 +224,7 @@ class NoisyGatesBackend(Backend):
 
         counts_ng = self.simulator.run(
             t_qiskit_circ=circuits, 
-            qubits_layout=qubits_layout_t, 
-            psi0=np.array(psi0), 
+            psi0=np.array(psi0),
             shots= self.options.shots, 
             device_param=device_parameters,  # device parameters
             nqubit=n_qubit_t)
@@ -233,7 +232,7 @@ class NoisyGatesBackend(Backend):
         end = time.time()
 
         # Measurament and post-process the result
-        counts_ng = fix_counts(counts_ng, n_measured_qubit)  # convert in qiskit notation
+        counts_ng = fix_counts(counts_ng["probs"], n_measured_qubit)  # convert in qiskit notation
 
         # Convert the result compatible with Qiskit
         exp_data = ExperimentResultData(counts=counts_ng) 
