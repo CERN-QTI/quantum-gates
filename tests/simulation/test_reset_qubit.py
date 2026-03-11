@@ -15,10 +15,6 @@ _location = "tests/helpers/device_parameters/ibm_kyoto/"
 _LAYOUT = [0, 1, 2, 3, 4]
 
 
-# ---------------------------------------------------------------------------
-# Helpers (mirrors the style used in test_simulators.py)
-# ---------------------------------------------------------------------------
-
 def _device_param(nqubits):
     dp = DeviceParameters(qubits_layout=_LAYOUT[:nqubits])
     dp.load_from_texts(location=_location)
@@ -75,10 +71,6 @@ def _build_reset_circuit(nqubits, prepare_ops=None, reset_qubits=None,
     qc.measure(range(nqubits), range(nqubits))
     return qc
 
-
-# ===========================================================================
-# 1. Correctness
-# ===========================================================================
 
 @pytest.mark.parametrize("nqubits,circuit_class", [
     (2, BinaryCircuit),
@@ -240,10 +232,6 @@ def test_multiple_consecutive_resets(circuit_class):
     )
 
 
-# ===========================================================================
-# 2. Integration with mid-circuit measurements
-# ===========================================================================
-
 @pytest.mark.parametrize("circuit_class", [BinaryCircuit, EfficientCircuit])
 def test_reset_produces_no_mid_counts_entry(circuit_class):
     """A plain reset (no separate mid-circuit measure instruction) should not
@@ -269,7 +257,6 @@ def test_reset_produces_no_mid_counts_entry(circuit_class):
             )
 
 
-
 @pytest.mark.parametrize("n_cycles,circuit_class", [
     (1, BinaryCircuit),
     (2, BinaryCircuit),
@@ -288,7 +275,7 @@ def test_reset_in_repeated_measure_reset_cycle(n_cycles, circuit_class):
 
     for cycle in range(n_cycles):
         qc.measure(0, nqubits + cycle)   # measure q0 to ancilla clbit
-        qc.reset(0)                       # reset q0 back to |0⟩
+        qc.reset(0)                            # reset q0 back to |0⟩
         qc.barrier()
 
     qc.measure(range(nqubits), range(nqubits))
@@ -300,15 +287,11 @@ def test_reset_in_repeated_measure_reset_cycle(n_cycles, circuit_class):
     for shot in result["results"]:
         for event in shot["mid"]:
             for o in event["outcome"]:
-                assert int(o) == 0, (
+                assert o == 0, (
                     f"Expected syndrome 0 from |0⟩ but got {o} "
                     f"at step {event['step']}"
                 )
 
-
-# ===========================================================================
-# 3. Noise scaling
-# ===========================================================================
 
 @pytest.mark.parametrize("circuit_class", [BinaryCircuit, EfficientCircuit])
 def test_reset_noise_free_vs_noisy(circuit_class):
@@ -339,7 +322,6 @@ def test_reset_noise_free_vs_noisy(circuit_class):
     assert p_clean > 0.90, (
         f"Expected P(|0...0⟩) > 0.90 for noise-free reset but got {p_clean:.4f}"
     )
-
 
 
 @pytest.mark.parametrize("n_resets,circuit_class", [
