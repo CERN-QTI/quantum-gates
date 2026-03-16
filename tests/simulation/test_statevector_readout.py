@@ -3,11 +3,21 @@ import numpy as np
 
 from qiskit import QuantumCircuit, transpile
 from qiskit_ibm_runtime.fake_provider import FakeBrisbane
+from qiskit_aer import AerSimulator
+from qiskit.circuit import QuantumCircuit
 
 from src.quantum_gates.simulators import MrAndersonSimulator
 from src.quantum_gates.circuits import BinaryCircuit, EfficientCircuit
 from src.quantum_gates.gates import standard_gates, almost_noise_free_gates
 from src.quantum_gates.utilities import DeviceParameters
+from src.quantum_gates.utilities import (
+    sv_normal_to_qiskit,
+    sv_qiskit_to_normal, 
+    extract_qubit_orders, 
+    permute_qiskit_sv_to_logical,
+    permute_normal_sv_to_logical_normal
+    ) 
+
 
 
 _backend = FakeBrisbane()
@@ -501,3 +511,144 @@ def test_statevector_readout_noise_free_closer_to_ideal_than_noisy(circuit_class
         f"Expected noise-free P(|11⟩) > noisy P(|11⟩) but got "
         f"p_clean={p_clean:.4f} <= p_noisy={p_noisy:.4f}"
     )
+
+# ---------------------------------------------------------------------------
+# 7. Comparison against Qiskit AerSimulator
+# ---------------------------------------------------------------------------
+
+def _qiskit_statevectors(qc_with_saves, save_labels):
+    """Run the circuit on Qiskit's AerSimulator and return a dict of
+    {label: statevector} for each save_statevector instruction.
+
+    We insert Qiskit's save_statevector instructions at the same points as
+    our barrier(label="save_sv_*") markers, then read back the snapshots.
+    """
+
+    sim = AerSimulator(method="statevector")
+    # AerSimulator needs save_statevector instructions injected at barrier points
+    # Rebuild the circuit replacing each save barrier with save_statevector
+
+    # Find the indices of qubits actually used in the transpiled circuit
+    used_indices = sorted({
+        qc_with_saves.find_bit(q).index
+        for op in qc_with_saves.data
+        for q in op.qubits
+        if op.operation.name not in ("barrier", "delay")
+    })
+    n_used = len(used_indices)
+    idx_map = {old: new for new, old in enumerate(used_indices)}
+    
+    new_qc = QuantumCircuit(n_used, qc_with_saves.num_clbits)
+
+    for op in qc_with_saves.data:
+        name = op.operation.name
+        if name == "barrier" and op.operation.label in save_labels:
+            new_qc.save_statevector(label=op.operation.label, pershot=False)
+        elif name == "delay":
+            qubit_idx = qc_with_saves.find_bit(op.qubits[0]).index
+            if qubit_idx in idx_map:
+                qargs = [new_qc.qubits[idx_map[qubit_idx]]]
+                new_qc.append(op.operation, qargs, [])
+        else:
+            qargs = [qc_with_saves.find_bit(q).index for q in op.qubits]
+            cargs = [qc_with_saves.find_bit(c).index for c in op.clbits]
+            new_qc.append(op.operation, qargs, cargs)
+
+    job = sim.run(new_qc, shots=1)
+    result = job.result()
+    data = result.data(0)
+    return {label: np.array(data[label]) for label in save_labels}
+
+
+@pytest.mark.parametrize("circuit_class", circuits)
+def test_statevector_readout_matches_qiskit_zero_state(circuit_class):
+    """On |0...0⟩ with no gates, our saved statevector should match Qiskit's
+    AerSimulator output exactly (up to global phase)."""
+    nqubits = 2
+    save_labels = ["save_sv_0"]
+
+    qc = QuantumCircuit(nqubits, nqubits)
+    qc.barrier(label="save_sv_0")
+    qc.measure(range(nqubits), range(nqubits))
+
+    t_circ = _transpile(qc, nqubits)
+    result = _run_sim(t_circ, nqubits, almost_noise_free_gates,
+                      circuit_class, shots=5)
+
+    qiskit_svs = _qiskit_statevectors(t_circ, save_labels)
+    qiskit_probs = _probs_from_sv(qiskit_svs["save_sv_0"])
+
+    for shot_readout in result["statevector_readout"]:
+        sv = _sv_from_shot(shot_readout, "save_sv_0")
+        sv_qiskit_perm = sv_normal_to_qiskit(sv)
+        our_probs = _probs_from_sv(sv_qiskit_perm)
+        assert np.allclose(our_probs, qiskit_probs, atol=1e-3), (
+            f"Statevector probabilities do not match Qiskit AerSimulator.\n"
+            f"Ours:   {our_probs}\n"
+            f"Qiskit: {qiskit_probs}"
+        )
+
+
+@pytest.mark.parametrize("circuit_class", circuits)
+def test_statevector_readout_matches_qiskit_after_x(circuit_class):
+    """After X on all qubits, our saved statevector probabilities should match
+    Qiskit's AerSimulator (up to noise tolerance)."""
+    nqubits = 2
+    save_labels = ["save_sv_0"]
+
+    qc = QuantumCircuit(nqubits, nqubits)
+    for q in range(nqubits):
+        qc.x(q)
+    qc.barrier(label="save_sv_0")
+    qc.measure(range(nqubits), range(nqubits))
+
+    t_circ = _transpile(qc, nqubits)
+    result = _run_sim(t_circ, nqubits, almost_noise_free_gates,
+                      circuit_class, shots=5)
+
+    qiskit_svs = _qiskit_statevectors(t_circ, save_labels)
+    qiskit_probs = _probs_from_sv(qiskit_svs["save_sv_0"])
+
+    for shot_readout in result["statevector_readout"]:
+        sv = _sv_from_shot(shot_readout, "save_sv_0")
+        sv_qiskit_perm = sv_normal_to_qiskit(sv)
+        our_probs = _probs_from_sv(sv_qiskit_perm)
+        assert np.allclose(our_probs, qiskit_probs, atol=1e-2), (
+            f"Statevector probabilities do not match Qiskit AerSimulator.\n"
+            f"Ours:   {our_probs}\n"
+            f"Qiskit: {qiskit_probs}"
+        )
+
+
+@pytest.mark.parametrize("circuit_class", circuits)
+def test_statevector_readout_matches_qiskit_multiple_snapshots(circuit_class):
+    """With multiple save points, each snapshot should match Qiskit's
+    AerSimulator at the corresponding point in the circuit."""
+    nqubits = 2
+    save_labels = ["save_sv_0", "save_sv_1", "save_sv_2"]
+
+    qc = QuantumCircuit(nqubits, nqubits)
+    qc.barrier(label="save_sv_0")   # |00⟩
+    qc.h(0)
+    qc.barrier(label="save_sv_1")   # superposition
+    qc.h(0)
+    qc.barrier(label="save_sv_2")   # back to |00⟩
+    qc.measure(range(nqubits), range(nqubits))
+
+    t_circ = _transpile(qc, nqubits)
+    result = _run_sim(t_circ, nqubits, almost_noise_free_gates,
+                      circuit_class, shots=5)
+
+    qiskit_svs = _qiskit_statevectors(t_circ, save_labels)
+
+    for shot_readout in result["statevector_readout"]:
+        for label in save_labels:
+            sv = _sv_from_shot(shot_readout, label)
+            sv_qiskit_perm = sv_normal_to_qiskit(sv)
+            our_probs = _probs_from_sv(sv_qiskit_perm)
+            qiskit_probs = _probs_from_sv(qiskit_svs[label])
+            assert np.allclose(our_probs, qiskit_probs, atol=1e-2), (
+                f"Snapshot '{label}' does not match Qiskit AerSimulator.\n"
+                f"Ours:   {our_probs}\n"
+                f"Qiskit: {qiskit_probs}"
+            )

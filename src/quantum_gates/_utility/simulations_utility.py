@@ -3,6 +3,7 @@ import multiprocessing
 import json
 import os
 import concurrent.futures
+from typing import Union, List, Tuple, Optional
 
 from qiskit import transpile, QuantumCircuit
 from qiskit_aer import AerSimulator
@@ -10,6 +11,7 @@ from qiskit.circuit.random import random_circuit
 from qiskit.providers.backend import BackendV2 as Backend
 from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit_ibm_runtime.fake_provider.fake_backend import FakeBackendV2
+from qiskit.quantum_info import Statevector
 
 
 def fix_counts(counts_0: dict, n_qubits: int) -> dict:
@@ -303,3 +305,241 @@ def pretty_print_data(data):
                         f"qubits={[q._index for q in op.qubits]} "
                         f"clbits={[c._index for c in op.clbits]}"
                     )
+
+def sv_normal_to_qiskit(sv: Union[np.ndarray, Statevector]) -> np.ndarray:
+
+    """
+    Convert a statevector from 'normal' ordering (q0 is MSB)
+    into Qiskit ordering (q0 is LSB).
+
+    Normal ordering basis: |q0 q1 ... q(n-1)>
+    Qiskit ordering basis: |q(n-1) ... q1 q0>
+
+    Parameters
+    ----------
+    sv : np.ndarray or Statevector
+        Input statevector in normal ordering.
+
+    Returns
+    -------
+    np.ndarray
+        Statevector reordered into Qiskit conventions.
+    """
+    # Convert Statevector → array
+    if isinstance(sv, Statevector):
+        arr = sv.data
+    else:
+        arr = np.asarray(sv)
+
+    # Determine number of qubits
+    N = int(np.log2(arr.size))
+    if 2**N != arr.size:
+        raise ValueError("Input statevector length is not a power of 2.")
+
+    # Reshape into tensor: (2, 2, ..., 2)
+    tensor = arr.reshape([2] * N)
+
+    # Reverse axes to flip qubit significance
+    tensor_qiskit = np.transpose(tensor, axes=range(N-1, -1, -1))
+
+    # Return flattened statevector
+    return tensor_qiskit.reshape(-1)
+
+
+def sv_qiskit_to_normal(sv: Union[np.ndarray, Statevector]) -> np.ndarray:
+    """
+    Convert a statevector from Qiskit ordering (q0 is LSB)
+    back into 'normal' ordering (q0 is MSB).
+
+    Qiskit ordering basis: |q(n-1) ... q1 q0>
+    Normal ordering basis: |q0 q1 ... q(n-1)>
+
+    Parameters
+    ----------
+    sv : np.ndarray or Statevector
+        Input statevector in Qiskit ordering.
+
+    Returns
+    -------
+    np.ndarray
+        Statevector reordered into normal conventions.
+    """
+    # Convert Statevector → array
+    if isinstance(sv, Statevector):
+        arr = sv.data
+    else:
+        arr = np.asarray(sv)
+
+    # Determine number of qubits
+    N = int(np.log2(arr.size))
+    if 2**N != arr.size:
+        raise ValueError("Input statevector length is not a power of 2.")
+
+    # Reshape into tensor: (2, 2, ..., 2)
+    tensor = arr.reshape([2] * N)
+
+    # Reverse axes again (inverse operation)
+    tensor_normal = np.transpose(tensor, axes=range(N-1, -1, -1))
+
+    # Return flattened vector
+    return tensor_normal.reshape(-1)
+
+
+def extract_qubit_orders(
+    transpiled: QuantumCircuit,
+    instruction_type: str
+) -> List[Tuple[Optional[str], List[int]]]:
+    """
+    Extract qubit ordering for *either* 'save_statevector' or
+    *barriers whose label contains 'save'*.
+
+    Parameters
+    ----------
+    transpiled : QuantumCircuit
+        The transpiled circuit.
+    instruction_type : str
+        Must be exactly "save_statevector" or "barrier".
+
+    Returns
+    -------
+    List[Tuple[label, qubit_order]]
+        label       : label of the instruction (or None)
+        qubit_order : physical qubit indices at that point
+    """
+
+    # Strict input validation
+    if instruction_type not in ("save_statevector", "barrier"):
+        raise ValueError("instruction_type must be either 'save_statevector' or 'barrier'.")
+
+    results: List[Tuple[Optional[str], List[int]]] = []
+
+    for inst, qargs, cargs in transpiled.data:
+        
+        if instruction_type == "barrier" and inst.name == "barrier":
+            if inst.label is not None and 'save' in inst.label:
+                label = inst.label
+                qubit_order = [transpiled.find_bit(q).index for q in qargs]
+                results.append((label, qubit_order))
+        
+        if instruction_type == "save_statevector" and inst.name == "save_statevector":
+            label = inst.label
+            qubit_order = [transpiled.find_bit(q).index for q in qargs]
+            results.append((label, qubit_order))
+
+    return results
+
+
+def permute_qiskit_sv_to_logical(
+    qiskit_order_sv: np.ndarray,
+    qubit_order: List[int]
+) -> np.ndarray:
+    """
+    Reorder a Qiskit-style statevector from *physical qubit order*
+    into *logical qubit order*, preserving Qiskit's LSB/MSB convention.
+
+    Qiskit stores statevectors such that qubit 0 is the *least significant bit*.
+    If a save_statevector instruction reports physical qubits in a different
+    order (e.g., due to layout or transpilation), this function maps the
+    statevector back into logical qubit indexing.
+
+    Parameters
+    ----------
+    qiskit_order_sv : np.ndarray
+        Statevector in Qiskit's physical qubit order.
+
+    qubit_order : List[int]
+        Mapping: logical_qubit → physical_qubit.
+        Example:
+            qubit_order = [2, 0, 1]
+            means:
+                logical q0 = physical q2
+                logical q1 = physical q0
+                logical q2 = physical q1
+
+    Returns
+    -------
+    np.ndarray
+        logical_qiskit_order_sv :
+        The same statevector, but expressed in logical qubit order,
+        while retaining Qiskit's least-significant-bit convention.
+    """
+    qiskit_order_sv = np.asarray(qiskit_order_sv)
+    n = len(qubit_order)
+
+    logical_qiskit_order_sv = np.zeros_like(qiskit_order_sv)
+
+    for idx in range(len(qiskit_order_sv)):
+
+        # Extract the physical bitstring from idx
+        phys_bits = [(idx >> i) & 1 for i in range(n)]
+
+        # Map physical bits → logical bits
+        log_bits = [phys_bits[qubit_order[logical]] for logical in range(n)]
+
+        # Compute index in logical bit order
+        new_idx = sum(log_bits[i] << i for i in range(n))
+
+        # Assign amplitude
+        logical_qiskit_order_sv[new_idx] = qiskit_order_sv[idx]
+
+    return logical_qiskit_order_sv
+
+
+def permute_normal_sv_to_logical_normal(
+    normal_order_sv: np.ndarray,
+    qubit_order: List[int]
+) -> np.ndarray:
+    """
+    Permute a *normal-ordered* statevector (MSB-first) from physical qubit
+    order back into logical qubit order, while preserving normal ordering.
+
+    Normal ordering basis:
+        |q0 q1 q2 ... q(n-1)>   with q0 = MSB
+
+    The qubit_order array maps:
+        logical_qubit -> physical_qubit
+
+    Parameters
+    ----------
+    normal_order_sv : np.ndarray
+        Statevector in physical *normal* ordering (MSB-first).
+
+    qubit_order : List[int]
+        Mapping: logical_qubit → physical_qubit index.
+        Example: [2, 0, 1] means:
+            logical q0 = physical q2
+            logical q1 = physical q0
+            logical q2 = physical q1
+
+    Returns
+    -------
+    np.ndarray
+        logical_normal_sv :
+        Statevector reordered into logical qubit indexing,
+        still using MSB-first normal ordering.
+    """
+
+    normal_order_sv = np.asarray(normal_order_sv)
+    n = len(qubit_order)
+    dim = len(normal_order_sv)
+
+    logical_normal_sv = np.zeros_like(normal_order_sv)
+
+    for idx in range(dim):
+        # Extract PHYSICAL bits, MSB-first
+        # Example: for n=3 → phys_bits = [q0, q1, q2]
+        phys_bits = [(idx >> (n-1-i)) & 1 for i in range(n)]
+
+        # Map physical bits → logical bits
+        # logical bit i = physical bit qubit_order[i]
+        log_bits = [phys_bits[qubit_order[i]] for i in range(n)]
+
+        # Compute new index in normal/MSB-first format
+        # |q0 q1 ... q(n-1)>
+        new_idx = 0
+        for b in log_bits:
+            new_idx = (new_idx << 1) | b
+
+        logical_normal_sv[new_idx] = normal_order_sv[idx]
+
+    return logical_normal_sv
