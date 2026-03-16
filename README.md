@@ -386,5 +386,5 @@ This project has been developed thanks to the effort of the following people:
 * Angelo Bassi 
 * Paolo Da Rold 
 * Cherilyn Christen
-* Nathan Pacey
+* Nathan Pacey (npacey01@gmail.com)
 * Roman Wixinger (roman.wixinger@gmail.com)

@@ -232,7 +232,6 @@ class NoiseFreeGates(object):
         return 1j * np.kron(sx_gate_ctr_1, sx_gate_trg_1) @ (first_cr @ np.kron(x_gate , relaxation_gate) @ second_cr ) @ np.kron(sx_gate_ctr_2, sx_gate_trg_2)
 
     
-
 class ScaledNoiseGates(object):
     """ Version of Gates in which the noise is scaled by a certain factor noise_scale of at least 1e-15.
 
@@ -345,10 +344,274 @@ class ScaledNoiseGates(object):
         )
 
 
-""" Instances """
+class CustomNoiseGates(object):
+    """
+    Gates with independently scalable device noise parameters.
+
+    By default, all scalers are set to 1.0 (physical device noise).
+    Smaller values reduce the effective noise strength.
+
+    Parameters
+    ----------
+    p_scale : float
+        Scaling factor for stochastic error probabilities (bitflip, depolarizing, etc.)
+    T1_scale : float
+        Scaling factor for T1 relaxation times
+    T2_scale : float
+        Scaling factor for T2 dephasing times
+    """
+
+    def __init__(self, p_scale: float = 1.0, T1_scale: float = 1.0, T2_scale: float = 1.0, pulse: Pulse=constant_pulse):
+        for name, val in {
+            "p_scale": p_scale,
+            "T1_scale": T1_scale,
+            "T2_scale": T2_scale,
+        }.items():
+            assert val >= 1e-15, f"{name} too small: {val} < 1e-15."
+        
+        self.p_scale = p_scale
+        self.T1_scale = T1_scale
+        self.T2_scale = T2_scale
+        
+        self.gates = Gates(pulse)
+
+    def relaxation(self, Dt, T1, T2) -> np.array:
+        return self.gates.relaxation(Dt, T1 / self.T1_scale, T2 / self.T2_scale)
+
+    def bitflip(self, Dt, p) -> np.array:
+        return self.gates.bitflip(Dt, p * self.p_scale)
+
+    def depolarizing(self, Dt, p) -> np.array:
+        return self.gates.depolarizing(Dt, p * self.p_scale)
+
+    def single_qubit_gate(self, theta, phi, p, T1, T2) -> np.array:
+        return self.gates.single_qubit_gate(
+            theta,
+            phi,
+            p * self.p_scale,
+            T1 / self.T1_scale,
+            T2 / self.T2_scale
+        )
+
+    def X(self, phi, p, T1, T2) -> np.array:
+        return self.gates.X(phi, p * self.p_scale, T1 / self.T1_scale, T2 / self.T2_scale)
+
+    def SX(self, phi, p, T1, T2) -> np.array:
+        return self.gates.SX(phi, p * self.p_scale, T1 / self.T1_scale, T2 / self.T2_scale)
+
+    def CR(self, theta, phi, t_cr, p_cr, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+        return self.gates.CR(
+            theta,
+            phi,
+            t_cr,
+            p_cr * self.p_scale,
+            T1_ctr / self.T1_scale,
+            T2_ctr / self.T2_scale,
+            T1_trg / self.T1_scale,
+            T2_trg / self.T2_scale,
+        )
+
+    def CNOT(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+        return self.gates.CNOT(
+            phi_ctr,
+            phi_trg,
+            t_cnot,
+            p_cnot * self.p_scale,
+            p_single_ctr * self.p_scale,
+            p_single_trg * self.p_scale,
+            T1_ctr / self.T1_scale,
+            T2_ctr / self.T2_scale,
+            T1_trg / self.T1_scale,
+            T2_trg / self.T2_scale,
+        )
+
+    def CNOT_inv(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+        return self.gates.CNOT_inv(
+            phi_ctr,
+            phi_trg,
+            t_cnot,
+            p_cnot * self.p_scale,
+            p_single_ctr * self.p_scale,
+            p_single_trg * self.p_scale,
+            T1_ctr / self.T1_scale,
+            T2_ctr / self.T2_scale,
+            T1_trg / self.T1_scale,
+            T2_trg / self.T2_scale
+        )
+    
+    def ECR(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+        return self.gates.ECR(
+            phi_ctr,
+            phi_trg,
+            t_ecr,
+            p_ecr * self.p_scale,
+            p_single_ctr * self.p_scale,
+            p_single_trg * self.p_scale,
+            T1_ctr / self.T1_scale,
+            T2_ctr / self.T2_scale,
+            T1_trg / self.T1_scale,
+            T2_trg / self.T2_scale
+        )
+    
+    def ECR_inv(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+        return self.gates.ECR_inv(
+            phi_ctr,
+            phi_trg,
+            t_ecr,
+            p_ecr * self.p_scale,
+            p_single_ctr * self.p_scale,
+            p_single_trg * self.p_scale,
+            T1_ctr / self.T1_scale,
+            T2_ctr / self.T2_scale,
+            T1_trg / self.T1_scale,
+            T2_trg / self.T2_scale,
+        )
+        
+        
+class CustomNoiseChannelsGates(object):
+    """
+    Delegates gate construction to either:
+      - NoiseFreeGates (for selected qubits)
+      - CustomNoiseGates (for all others)
+
+    Fully interface-compatible with existing gate classes.
+    """
+
+    def __init__(
+        self,
+        noiseless_qubits,
+        p_scale=1.0,
+        T1_scale=1.0,
+        T2_scale=1.0,
+        pulse=constant_pulse,
+    ):
+        self.noiseless_qubits = set(noiseless_qubits)
+
+        self.noise_free = NoiseFreeGates()
+        self.noisy = CustomNoiseGates(
+            p_scale=p_scale,
+            T1_scale=T1_scale,
+            T2_scale=T2_scale,
+            pulse=pulse,
+        )
+
+    # ---------- internal dispatcher ----------
+
+    def _select(self, qubit_index):
+        # If qubit index is unknown, default to noisy (safe choice)
+        if qubit_index is not None and qubit_index in self.noiseless_qubits:
+            return self.noise_free
+        return self.noisy
+
+    # ---------- single-qubit noise processes ----------
+
+    def relaxation(self, Dt, T1, T2, *, qubit_index=None):
+        return self._select(qubit_index).relaxation(Dt, T1, T2)
+
+    def bitflip(self, Dt, p, *, qubit_index=None):
+        return self._select(qubit_index).bitflip(Dt, p)
+
+    def depolarizing(self, Dt, p, *, qubit_index=None):
+        return self._select(qubit_index).depolarizing(Dt, p)
+
+    # ---------- single-qubit gates ----------
+
+    def single_qubit_gate(self, theta, phi, p, T1, T2, *, qubit_index=None):
+        return self._select(qubit_index).single_qubit_gate(
+            theta, phi, p, T1, T2
+        )
+
+    def X(self, phi, p, T1, T2, *, qubit_index=None):
+        return self._select(qubit_index).X(phi, p, T1, T2)
+
+    def SX(self, phi, p, T1, T2, *, qubit_index=None):
+        return self._select(qubit_index).SX(phi, p, T1, T2)
+
+    # ---------- two-qubit gates ----------
+    # Noise is keyed to the control qubit (ctr)
+
+    def CR(
+        self,
+        theta, phi, t_cr, p_cr,
+        T1_ctr, T2_ctr, T1_trg, T2_trg,
+        *, qubit_index=None
+    ):
+        return self._select(qubit_index).CR(
+            theta, phi, t_cr, p_cr,
+            T1_ctr, T2_ctr, T1_trg, T2_trg
+        )
+
+    def CNOT(
+        self,
+        phi_ctr, phi_trg, t_cnot,
+        p_cnot, p_single_ctr, p_single_trg,
+        T1_ctr, T2_ctr, T1_trg, T2_trg,
+        *, qubit_index=None
+    ):
+        return self._select(qubit_index).CNOT(
+            phi_ctr, phi_trg, t_cnot,
+            p_cnot, p_single_ctr, p_single_trg,
+            T1_ctr, T2_ctr, T1_trg, T2_trg
+        )
+
+    def CNOT_inv(
+        self,
+        phi_ctr, phi_trg, t_cnot,
+        p_cnot, p_single_ctr, p_single_trg,
+        T1_ctr, T2_ctr, T1_trg, T2_trg,
+        *, qubit_index=None
+    ):
+        return self._select(qubit_index).CNOT_inv(
+            phi_ctr, phi_trg, t_cnot,
+            p_cnot, p_single_ctr, p_single_trg,
+            T1_ctr, T2_ctr, T1_trg, T2_trg
+        )
+
+    def ECR(
+        self,
+        phi_ctr, phi_trg, t_ecr,
+        p_ecr, p_single_ctr, p_single_trg,
+        T1_ctr, T2_ctr, T1_trg, T2_trg,
+        *, qubit_index=None
+    ):
+        return self._select(qubit_index).ECR(
+            phi_ctr, phi_trg, t_ecr,
+            p_ecr, p_single_ctr, p_single_trg,
+            T1_ctr, T2_ctr, T1_trg, T2_trg
+        )
+
+    def ECR_inv(
+        self,
+        phi_ctr, phi_trg, t_ecr,
+        p_ecr, p_single_ctr, p_single_trg,
+        T1_ctr, T2_ctr, T1_trg, T2_trg,
+        *, qubit_index=None
+    ):
+        return self._select(qubit_index).ECR_inv(
+            phi_ctr, phi_trg, t_ecr,
+            p_ecr, p_single_ctr, p_single_trg,
+            T1_ctr, T2_ctr, T1_trg, T2_trg
+        )
+
+
+""" Instances of Gates with different noise levels and pulse shapes """
 
 # Constant pulses
 standard_gates = Gates(pulse=constant_pulse)
 numerical_gates = Gates(pulse=constant_pulse_numerical)
 noise_free_gates = NoiseFreeGates()
 almost_noise_free_gates = ScaledNoiseGates(noise_scaling=1e-15)
+
+# Reduced stochastic noise only
+low_pauli_noise_gates = CustomNoiseGates(
+    p_scale=0.1,
+    T1_scale=1.0,
+    T2_scale=1.0,
+)
+
+# Reduced decoherence only
+long_coherence_gates = CustomNoiseGates(
+    p_scale=1.0,
+    T1_scale=0.1,
+    T2_scale=0.1,
+)
