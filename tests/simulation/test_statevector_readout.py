@@ -76,7 +76,7 @@ def _almost_equal_sv(sv1, sv2, tol=ABS_TOL):
     return np.allclose(probs1, probs2, atol=tol)
 
 
-circuits = [EfficientCircuit]#[BinaryCircuit, EfficientCircuit]
+circuits = [BinaryCircuit, EfficientCircuit]
 
 # ---------------------------------------------------------------------------
 # 1. Output structure

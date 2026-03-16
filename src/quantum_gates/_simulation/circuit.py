@@ -1278,6 +1278,23 @@ class BinaryCircuit(object):
         self._backend = self._BackendClass(self.nqubit)
         self._info_gates_list = []
 
+    def statevector_readout(self, psi0) -> np.array:
+        
+        psi = psi0.copy()
+    
+        dim = len(psi)
+        n = int(np.log2(dim))
+
+        for qubit in range(n):
+            if self.phi[qubit] != 0:
+                phase = self.phi[qubit]
+                for idx in range(dim):
+                    bit = (idx >> (n - 1 - qubit)) & 1
+                    if bit == 1:
+                        psi[idx] *= np.exp(1j * phase)
+        
+        return psi
+
 
 class StandardCircuit(AlternativeCircuit):
     """Class with the same interface as Circuit but built on top of the AlternativeCircuit.
