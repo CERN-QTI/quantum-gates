@@ -1042,6 +1042,8 @@ class BinaryCircuit(object):
             # normal case
             else:
                 p0 /= s; p1 /= s
+                print(f"Measuring qubit {target_qubit}: p(0)={p0:.4f}, p(1)={p1:.4f}")
+                print(f'state: {psi}')
                 outcome = np.random.choice([0, 1], p=[p0, p1])
             # record outcome in qubit order
             outcomes_in_q_order.append(outcome)

@@ -328,6 +328,9 @@ class MrAndersonSimulator(object):
             # Not yet implemented fancy gates
             elif op_name in ("if_else", "if_test", "control_flow", "switch_case"):
                 raise NotImplementedError("if condition found in circuit, which is not implemented yet.")
+            
+            elif op_name == 'swap':
+                raise NotImplementedError("swap operation found in circuit, which is not implemented yet.")
 
             elif op_name in ("statevector_readout", "save_statevector", "save_state"):
                 raise NotImplementedError("saving statevector(s) operation found in circuit, which is not implemented yet.")

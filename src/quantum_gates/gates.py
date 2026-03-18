@@ -10,6 +10,6 @@ Attributes:
     almost_noise_free_gates (ScaledNoiseGates): Gates in the noise free case, but based on scaling the noise down.
 """
 
-from ._gates.gates import Gates, NoiseFreeGates, ScaledNoiseGates, CustomNoiseGates, CustomNoiseChannelsGates
-from ._gates.gates import standard_gates, noise_free_gates, almost_noise_free_gates, numerical_gates
+from ._gates.gates import Gates, NoiseFreeGates, ScaledNoiseGates, CustomNoiseGates, CustomNoiseChannelsGates, SpecificNoiseGates
+from ._gates.gates import standard_gates, noise_free_gates, almost_noise_free_gates, numerical_gates, low_pauli_noise_gates, long_coherence_gates
 from ._legacy.gates import LegacyGates as legacy_gates
