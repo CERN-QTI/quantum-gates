@@ -743,7 +743,6 @@ class AlternativeCircuit(object):
         Returns:
               None
         """
-        #print("\n X -GATE on qubit", i, "with p =", p, ", T1 =", T1, ", T2 =", T2)
         self.apply(gate=self._gate_call(self.gates.X, -self.phi[i], p, T1, T2, qubit_index=i), i=i)
 
     def SX(self, i: int, p: float, T1: float, T2: float):
@@ -1045,8 +1044,6 @@ class BinaryCircuit(object):
             # normal case
             else:
                 p0 /= s; p1 /= s
-                print(f"Measuring qubit {target_qubit}: p(0)={p0:.4f}, p(1)={p1:.4f}")
-                print(f'state: {psi}')
                 outcome = np.random.choice([0, 1], p=[p0, p1])
             # record outcome in qubit order
             outcomes_in_q_order.append(outcome)
