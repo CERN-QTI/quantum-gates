@@ -702,6 +702,10 @@ def test_no_noise_channels_two_qubit_dispatch():
     assert _almost_equal(U, U_ref)
 
 
+
+
+
+
 # ============================================================
 # Pickle tests 
 # ============================================================

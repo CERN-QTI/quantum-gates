@@ -434,17 +434,20 @@ class CustomNoiseGates(NoiseScalingMixin):
     """
 
     def __init__(self, p_scale: float = 1.0, T1_scale: float = 1.0, T2_scale: float = 1.0, pulse: Pulse=constant_pulse):
-        for name, val in {
-            "p_scale": p_scale,
-            "T1_scale": T1_scale,
-            "T2_scale": T2_scale,
-        }.items():
+        # --- validate p_scale ---
+        if not np.isfinite(p_scale):
+            raise ValueError(f"p_scale must be finite, got {p_scale}")
+        if p_scale < 0:
+            raise ValueError(f"p_scale must be >= 0, got {p_scale}")
+        if p_scale > 1e3:
+            raise ValueError(f"p_scale too large: {p_scale} > 1e3 (likely unphysical)")
+
+        # --- validate T1_scale / T2_scale ---
+        for name, val in {"T1_scale": T1_scale, "T2_scale": T2_scale}.items():
             if not np.isfinite(val):
                 raise ValueError(f"{name} must be finite, got {val}")
-
-            if val < 1e-20:
-                raise ValueError(f"{name} too small: {val} < 1e-20")
-
+            if val <= 0:
+                raise ValueError(f"{name} must be > 0, got {val}")
             if val > 1e6:
                 raise ValueError(f"{name} too large: {val} > 1e6 (unphysical regime)")
 
@@ -583,7 +586,7 @@ class SpecificNoiseGates:
                 raise ValueError(f"p_val must be in [0,1], got {val}")
 
 
-        def _validate_T(name, val, min_val=1e-20, max_val=1e6):
+        def _validate_T(name, val, min_val=1e-20, max_val=1e20):
             if val is None:
                 return
             if not np.isfinite(val):
@@ -653,14 +656,25 @@ class SpecificNoiseGates:
             self._T2(T2_trg),
         )
 
-    def CNOT(self, phi_ctr, phi_trg, t_cnot, p_cnot,
-             p_single_ctr, p_single_trg,
-             T1_ctr, T2_ctr, T1_trg, T2_trg):
+    def CNOT(
+        self,
+        phi_ctr, phi_trg, t_cnot, p_cnot,
+        p_single_ctr, p_single_trg,
+        T1_ctr, T2_ctr, T1_trg, T2_trg
+    ):
         return self.gates.CNOT(
-            phi_ctr, phi_trg, t_cnot,
+            phi_ctr,
+            phi_trg,
+            t_cnot,
+
+            # --- ONLY override two-qubit noise ---
             self._p(p_cnot),
-            self._p(p_single_ctr),
-            self._p(p_single_trg),
+
+            # --- KEEP single-qubit noise as-is ---
+            p_single_ctr,
+            p_single_trg,
+
+            # --- still override decoherence ---
             self._T1(T1_ctr),
             self._T2(T2_ctr),
             self._T1(T1_trg),
@@ -671,10 +685,15 @@ class SpecificNoiseGates:
                  p_single_ctr, p_single_trg,
                  T1_ctr, T2_ctr, T1_trg, T2_trg):
         return self.gates.CNOT_inv(
-            phi_ctr, phi_trg, t_cnot,
+            phi_ctr,
+            phi_trg,
+            t_cnot,
+            # --- ONLY override two-qubit noise ---
             self._p(p_cnot),
-            self._p(p_single_ctr),
-            self._p(p_single_trg),
+            # --- KEEP single-qubit noise as-is ---
+            p_single_ctr,
+            p_single_trg,
+            # --- still override decoherence ---
             self._T1(T1_ctr),
             self._T2(T2_ctr),
             self._T1(T1_trg),
@@ -686,13 +705,16 @@ class SpecificNoiseGates:
             phi_ctr,
             phi_trg,
             t_ecr,
+            # --- ONLY override two-qubit noise ---
             self._p(p_ecr),
-            self._p(p_single_ctr),
-            self._p(p_single_trg),
+            # --- KEEP single-qubit noise as-is ---
+            p_single_ctr,
+            p_single_trg,
+            # --- still override decoherence ---
             self._T1(T1_ctr),
             self._T2(T2_ctr),
             self._T1(T1_trg),
-            self._T2(T2_trg)
+            self._T2(T2_trg),
         )
     
     def ECR_inv(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
@@ -700,9 +722,11 @@ class SpecificNoiseGates:
             phi_ctr,
             phi_trg,
             t_ecr,
+            # --- ONLY override two-qubit noise ---
             self._p(p_ecr),
-            self._p(p_single_ctr),
-            self._p(p_single_trg),
+            # --- KEEP single-qubit noise as-is ---
+            p_single_ctr,
+            p_single_trg,   
             self._T1(T1_ctr),
             self._T2(T2_ctr),
             self._T1(T1_trg),

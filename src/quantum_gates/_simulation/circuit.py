@@ -505,32 +505,31 @@ class AlternativeCircuit(object):
             self._update_mp_list()
             
     def _gate_call(self, fn, *args, **kwargs):
-        """
-        Call a gate constructor with a 'noisy' signature if available.
-        If the gate is noise-free (fewer params), progressively trim
-        trailing positional args until the call succeeds.
-        """
-        # try full signature first
+
+        # First try full call
         try:
             return fn(*args, **kwargs)
         except TypeError:
             pass
 
-        # progressively trim trailing args
+        # Remove unsupported kwargs BEFORE retrying
+        clean_kwargs = kwargs.copy()
+        for key in ["qubit_index", "ctr_index", "trg_index"]:
+            clean_kwargs.pop(key, None)
+
+        # Try again with cleaned kwargs
+        try:
+            return fn(*args, **clean_kwargs)
+        except TypeError:
+            pass
+
+        # Now trim args ONLY (no kwargs)
         for cut in range(len(args) - 1, -1, -1):
             try:
-                return fn(*args[:cut], **kwargs)
-            
+                return fn(*args[:cut])
             except TypeError:
                 continue
 
-        # Fallback for legacy noise classes
-        for key in ["qubit_index", "ctr_index", "trg_index"]:
-            kwargs.pop(key, None)
-
-        return fn(*args)
-
-        # last resort: try with no args (some gates may be nullary)
         return fn()
 
     def statevector(self, psi0) -> np.array:

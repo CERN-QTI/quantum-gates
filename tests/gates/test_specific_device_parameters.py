@@ -31,6 +31,19 @@ twoq_args = dict(
     T2_trg=30e3,
 )
 
+twoq_args_ecr = dict(
+    phi_ctr=np.pi/2,
+    phi_trg=np.pi/2,
+    t_ecr=300e-9,
+    p_ecr=0.01,
+    p_single_ctr=0.01,
+    p_single_trg=0.01,
+    T1_ctr=50e3,
+    T2_ctr=30e3,
+    T1_trg=50e3,
+    T2_trg=30e3,
+)
+
 def _almost_equal(m1, m2, tol=1e-9):
     return np.allclose(m1, m2, atol=tol)
 
@@ -135,10 +148,20 @@ def test_specific_noise_noiseless_limit():
 def test_specific_noise_two_qubit_override():
     """Override applies consistently to both qubits."""
     g = SpecificNoiseGates(p_val=0.02, T1_val=10e3, T2_val=5e3)
-
+    np.random.seed(5)
     res1 = g.CNOT(**twoq_args)
-    res2 = g.CNOT(
-        **{**twoq_args, "p_cnot": 0.5, "T1_ctr": 1e6, "T2_ctr": 1e6}
-    )
+    np.random.seed(5)
+    res2 = g.CNOT(**{**twoq_args, "p_cnot": 0.5, "T1_ctr": 1e6, "T2_ctr": 1e6})
+
+    assert np.allclose(res1, res2)
+
+
+def test_specific_noise_ECR_override():
+    """Override applies consistently to both qubits."""
+    g = SpecificNoiseGates(p_val=0.02, T1_val=10e3, T2_val=5e3)
+    np.random.seed(5)
+    res1 = g.ECR(**twoq_args_ecr)
+    np.random.seed(5)
+    res2 = g.ECR(**{**twoq_args_ecr, "p_ecr": 0.5, "T1_ctr": 1e6, "T2_ctr": 1e6})
 
     assert np.allclose(res1, res2)
