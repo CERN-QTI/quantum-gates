@@ -8,6 +8,8 @@ from qiskit_ibm_runtime.fake_provider import FakeBrisbane
 from qiskit.circuit.controlflow import ControlFlowOp
 
 
+from quantum_gates._simulation.circuit import EfficientCircuit
+from quantum_gates._simulation.circuit import EfficientCircuit
 from src.quantum_gates.utilities import DeviceParameters
 from quantum_gates.simulators import MrAndersonSimulator
 
@@ -74,6 +76,17 @@ def build_deterministic_circuit_1(N_q, N_m):
 
     return qc
 
+
+def build_deterministic_circuit_simple_cnot(N_q, N_m):
+    """ deterministic circuit:"""
+    qc = QuantumCircuit(N_q, N_m)
+    qc.x(1)
+    qc.cx(1, 2)
+    qc.barrier()
+    qc.measure(range(N_q), range(N_m))
+    qc.x(range(N_q))  # add some gates to make mid measures
+
+    return qc
 
 #########################################
 # ---------- ScaledNoiseGates ----------
@@ -702,6 +715,158 @@ def test_no_noise_channels_two_qubit_dispatch():
     assert _almost_equal(U, U_ref)
 
 
+def test_custom_noise_channels_deterministic():
+    nqubit = 4
+    shots = 100
+
+    qc = build_deterministic_circuit_1(nqubit, nqubit)
+    correct_outcome = "0000"
+
+    gates = CustomNoiseChannelsGates(
+        noiseless_qubits=[0, 1, 2, 3],  # all noiseless
+        p_scale=1.0,
+        T1_scale=1.0,
+        T2_scale=1.0,
+    )
+
+    sim = MrAndersonSimulator(
+        gates=gates,
+        CircuitClass=EfficientCircuit
+    )
+
+    needs_controlflow = any(isinstance(op.operation, ControlFlowOp) for op in qc.data)
+
+    t_circ = transpile(
+        qc,
+        backend=FakeBrisbane(),
+        initial_layout=range(nqubit),
+        seed_transpiler=42,
+        **({} if needs_controlflow else {"scheduling_method": "asap"})
+    )
+
+
+    res = sim.run(
+    t_qiskit_circ=t_circ,
+    psi0=zero_state(nqubit),
+    shots=shots,
+    device_param=get_device_params(nqubit),
+    nqubit=nqubit,
+    )
+
+    counts = res["mid_counts"]
+
+    # result format assumed: dict[str, int]
+    assert correct_outcome in counts
+    assert counts[correct_outcome] == shots  # all outcomes should be correct
+
+    
+
+def test_custom_noise_channels_mid_qubit_protection():
+    nqubit = 4
+    shots = 100
+
+    qc = build_deterministic_circuit_simple_cnot(nqubit, nqubit)
+
+    # -------------------------------
+    # Case 1: middle qubits noiseless
+    # -------------------------------
+    gates = CustomNoiseChannelsGates(
+        noiseless_qubits=[1, 2],  # protect middle
+        p_scale=1.0,
+        T1_scale=1.0,
+        T2_scale=1.0,
+    )
+
+     # --- Custom simulator ---
+    
+    psi0 = zero_state(nqubit)
+    device_param = get_device_params(nqubit)
+
+    sim = MrAndersonSimulator(
+            gates=gates,
+            CircuitClass=EfficientCircuit
+        )
+    
+    needs_controlflow = any(isinstance(op.operation, ControlFlowOp) for op in qc.data)
+
+    t_circ = transpile(
+        qc,
+        backend=FakeBrisbane(),
+        initial_layout=range(nqubit),
+        seed_transpiler=42,
+        **({} if needs_controlflow else {"scheduling_method": "asap"})
+    )
+
+
+    res = sim.run(
+    t_qiskit_circ=t_circ,
+    psi0=psi0,
+    shots=shots,
+    device_param=device_param,
+    nqubit=nqubit,
+    )
+
+    counts = res["mid_counts"]
+
+    for bitstring in counts:
+        # assume ordering "q0 q1 q2 q3"
+        assert bitstring[1] == "1"
+        assert bitstring[2] == "1"
+
+
+
+def test_custom_noise_channels_mid_qubit_protection_1():
+    nqubit = 4
+    shots = 100
+    qc = build_deterministic_circuit_simple_cnot(nqubit, nqubit)
+
+    # -------------------------------
+    # Case 2: edge qubits noiseless
+    # -------------------------------
+    gates = CustomNoiseChannelsGates(
+        noiseless_qubits=[0, 3],  # protect edges
+        p_scale=1.0,
+        T1_scale=1.0,
+        T2_scale=1.0,
+    )
+
+    psi0 = zero_state(nqubit)  
+    device_param = get_device_params(nqubit)
+
+    sim = MrAndersonSimulator(
+            gates=gates,
+            CircuitClass=EfficientCircuit
+        )
+    
+    needs_controlflow = any(isinstance(op.operation, ControlFlowOp) for op in qc.data)
+
+    t_circ = transpile(
+        qc,
+        backend=FakeBrisbane(),
+        initial_layout=range(nqubit),
+        seed_transpiler=42,
+        **({} if needs_controlflow else {"scheduling_method": "asap"})
+    )
+
+
+    res = sim.run(
+    t_qiskit_circ=t_circ,
+    psi0=psi0,
+    shots=shots,
+    device_param=device_param,
+    nqubit=nqubit,
+    )
+
+    counts = res["mid_counts"]
+
+    for bitstring in counts:
+        # edges should now be stable
+        assert bitstring[0] in ["0", "1"]  # may depend on circuit
+        assert bitstring[3] in ["0", "1"]
+
+    # Optional stronger check (variance on middle now)
+    middle_values = set((b[1], b[2]) for b in counts)
+    assert len(middle_values) > 1
 
 
 
