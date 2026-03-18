@@ -309,8 +309,8 @@ def pretty_print_data(data):
 def sv_normal_to_qiskit(sv: Union[np.ndarray, Statevector]) -> np.ndarray:
 
     """
-    Convert a statevector from 'normal' ordering (q0 is MSB)
-    into Qiskit ordering (q0 is LSB).
+    Convert a statevector from 'normal' ordering (q0 is  - big endian notation)
+    into Qiskit ordering (q0 is LSB - little endian notation).
 
     Normal ordering basis: |q0 q1 ... q(n-1)>
     Qiskit ordering basis: |q(n-1) ... q1 q0>
@@ -348,8 +348,8 @@ def sv_normal_to_qiskit(sv: Union[np.ndarray, Statevector]) -> np.ndarray:
 
 def sv_qiskit_to_normal(sv: Union[np.ndarray, Statevector]) -> np.ndarray:
     """
-    Convert a statevector from Qiskit ordering (q0 is LSB)
-    back into 'normal' ordering (q0 is MSB).
+    Convert a statevector from Qiskit ordering (q0 is LSB - little endian notation)
+    back into 'normal' ordering (q0 is MSB - big endian notation).
 
     Qiskit ordering basis: |q(n-1) ... q1 q0>
     Normal ordering basis: |q0 q1 ... q(n-1)>
