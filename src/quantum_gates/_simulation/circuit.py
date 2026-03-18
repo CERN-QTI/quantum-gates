@@ -522,9 +522,13 @@ class AlternativeCircuit(object):
                 return fn(*args[:cut], **kwargs)
             
             except TypeError:
-                # Fallback for legacy noise classes
-                kwargs.pop("qubit_index", None)
-                return fn(*args)
+                continue
+
+        # Fallback for legacy noise classes
+        for key in ["qubit_index", "ctr_index", "trg_index"]:
+            kwargs.pop(key, None)
+
+        return fn(*args)
 
         # last resort: try with no args (some gates may be nullary)
         return fn()
@@ -786,14 +790,14 @@ class AlternativeCircuit(object):
             # Control i
             self._mp[i] = self._gate_call(
                 self.gates.CNOT,
-                self.phi[i], self.phi[k], t_int, p_i_k, p_i, p_k, T1_ctr, T2_ctr, T1_trg, T2_trg, qubit_index=i
+                self.phi[i], self.phi[k], t_int, p_i_k, p_i, p_k, T1_ctr, T2_ctr, T1_trg, T2_trg, ctr_index=i, trg_index=k
             )
             self.phi[i] = self.phi[i] - np.pi/2
         else:
             # Control i
             self._mp[i] = self._gate_call(
                 self.gates.CNOT_inv,
-                self.phi[i], self.phi[k], t_int, p_i_k, p_i, p_k, T1_ctr, T2_ctr, T1_trg, T2_trg, qubit_index=i
+                self.phi[k], self.phi[i], t_int, p_i_k, p_i, p_k, T1_ctr, T2_ctr, T1_trg, T2_trg, ctr_index=k, trg_index=i
             )
 
             self.phi[i] = self.phi[i] + np.pi/2 + np.pi
@@ -836,13 +840,13 @@ class AlternativeCircuit(object):
             # Control i
             self._mp[i] = self._gate_call(
                 self.gates.ECR,
-                self.phi[i], self.phi[k], t_ecr, p_i_k, p_i, p_k, T1_ctr, T2_ctr, T1_trg, T2_trg, qubit_index=i
+                self.phi[i], self.phi[k], t_ecr, p_i_k, p_i, p_k, T1_ctr, T2_ctr, T1_trg, T2_trg, ctr_index=i, trg_index=k
             )
         else:
             # Control i
             self._mp[i] = self._gate_call(
                 self.gates.ECR_inv,
-                self.phi[k], self.phi[i], t_ecr, p_i_k, p_i, p_k, T1_ctr, T2_ctr, T1_trg, T2_trg, qubit_index=i
+                self.phi[k], self.phi[i], t_ecr, p_i_k, p_i, p_k, T1_ctr, T2_ctr, T1_trg, T2_trg, ctr_index=k, trg_index=i
             )
 
         # Bookkeeping
