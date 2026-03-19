@@ -1,0 +1,259 @@
+# Add Flexible Noise Control via New Noise Gate Classes
+
+## Summary
+
+This PR introduces a set of **new noise control abstractions** that allow users to flexibly:
+
+- Scale noise globally
+- Tune noise parameters independently (e.g. depolarizing vs decoherence)
+- Override device noise with fixed values
+- Selectively apply noise on a **per-qubit basis**
+
+These additions improve the **experimental control**, **debugging capability**, and **hardware-aware modeling** of the simulator.
+
+these changes are especially useful for QEC workflows or any work that requires analysis of noise impacts or noise free channels
+
+---
+
+##  Files Added / Modified
+
+### Core Implementation
+- `quantum_gates/gates.py`
+  - Added:
+    - `ScaledNoiseGates`
+    - `CustomNoiseGates`
+    - `SpecificNoiseGates`
+    - `CustomNoiseChannelsGates`
+  - Extended two-qubit gate interfaces (`CNOT`, `CR`, `ECR`, etc.) to support qubit-aware routing
+
+
+
+### Circuit Integration
+- `BinaryCircuit` and `AlternativeCircuit`
+  - Updated to pass:
+    ```python
+    ctr_index=i, trg_index=k
+    ```
+  - Ensures correct routing for two-qubit noise models
+
+### Tests
+- `tests/gates/test_specific_device_parameters.py`
+    - File to test the SpecificNoiseGates Class
+
+- `tests/gates/test_noise_scaling.py`
+    - Tests all other new Noise Classes
+    - uses a vairety of testing examples
+
+- New tests for:
+  - Two-qubit override consistency
+  - Qubit-local noise routing
+  - Deterministic behavior with fixed noise
+
+### Notebook (Usage Demo)
+- `start up and testing/test noise channel.ipynb`
+
+This notebook demonstrates:
+- How to instantiate each noise class
+- How to plug them into the simulator
+- Comparison against **Qiskit Aer** noise models
+- simple circuit examples that can test the noise classes
+- Visualization of noise effects on circuits
+
+---
+
+## Physical Modeling Overview
+
+The simulator models noise using:
+
+- **Depolarizing channels** → stochastic Pauli errors  
+- **Relaxation (T1)** → amplitude damping  
+- **Dephasing (T2)** → phase damping  
+
+These correspond to standard Lindblad-type noise processes.
+
+Key modeling principle:
+
+> Noise is parameterized through device-level quantities (`p`, `T1`, `T2`) and incorporated directly into gate construction.
+
+
+## New Noise Classes
+
+### `NoiseScalingMixin`
+
+Shared utility class for physically consistent scaling of noise parameters.
+
+#### Scaling Rules
+
+- **Depolarizing probability**:
+
+  $$ p \rightarrow p_{scaled} = \min(p \cdot s, 1 - \epsilon) $$
+
+- **Relaxation / Dephasing**:
+
+  $$ \gamma = \frac{1}{T}, \quad \gamma_{scaled} = s \cdot \gamma $$
+
+  $$ T_{scaled} = \frac{1}{\gamma_{scaled}} $$
+
+#### Purpose
+
+- Prevents unphysical parameter regimes
+- Ensures numerical stability
+- Provides consistent scaling across all derived classes
+
+---
+
+### `ScaledNoiseGates`
+
+Uniform scaling of all noise sources:
+
+```python
+ScaledNoiseGates(noise_scaling=0.1)
+```
+
+#### Interpretation
+
+- Reduces depolarizing probability
+- Increases coherence times
+- Moves system toward noiseless limit
+
+#### Use Cases
+
+- Noise sensitivity analysis
+- Studying transitions: ideal → realistic
+- Benchmarking algorithms under varying noise levels
+
+---
+
+### `CustomNoiseGates`
+
+Independent scaling of different noise channels:
+
+```python
+CustomNoiseGates(
+    p_scale=0.1,
+    T1_scale=1.0,
+    T2_scale=1.0
+)
+```
+
+#### Physical Motivation
+
+Separates:
+
+- **Stochastic errors** (Pauli noise)
+- **Dissipative errors** (T1)
+- **Dephasing** (T2)
+
+#### Use Cases
+
+- Investigating dominant noise mechanisms
+- Simulating device improvements
+- Controlled studies of decoherence vs stochastic noise
+
+---
+
+### `SpecificNoiseGates`
+
+Overrides all device parameters with fixed values:
+
+```python
+SpecificNoiseGates(
+    p_val=0.02,
+    T1_val=10e3,
+    T2_val=5e3
+)
+```
+
+#### Behavior
+
+- Ignores input device parameters
+- Uses fixed noise values across all gates
+
+#### Use Cases
+
+- Deterministic simulations
+- Reproducing specific hardware regimes
+- Controlled benchmarking
+
+---
+
+### `CustomNoiseChannelsGates` ⭐
+
+Enables **qubit-dependent noise modeling**.
+
+```python
+CustomNoiseChannelsGates(
+    noiseless_qubits=[1, 2]
+)
+```
+
+#### Physical Interpretation
+
+Allows modeling systems where:
+
+- Some qubits are **ideal**
+- Others are **noisy**
+
+#### Two-Qubit Logic
+
+```python
+if ctr ∈ noiseless AND trg ∈ noiseless:
+    → noise-free gate
+else:
+    → noisy gate
+```
+
+#### Features
+
+- Per-qubit noise selection
+- Compatible with entangling gates
+- Supports mixed noise environments
+
+#### Use Cases
+
+- QEC logical qubit protection
+- Error mitigation experiments
+- Noise localization studies
+
+---
+
+### Circuit Updates
+
+Circuit classes now explicitly pass qubit indices:
+
+```python
+ctr_index=i, trg_index=k
+```
+
+This enables:
+- Correct noise dispatch
+- Qubit-aware simulation
+
+---
+
+##  Testing
+
+### Added Tests
+
+- `SpecificNoiseGates` override consistency
+- Two-qubit override propagation
+- `CustomNoiseChannelsGates` routing correctness
+
+### Example Validation
+
+- Protect qubits `[1,2]`
+- Apply entangling circuit
+- Verify stability:
+
+```python
+assert bitstring[1] == "1"
+assert bitstring[2] == "1"
+```
+
+ Confirms:
+- Noise is localized correctly
+- Two-qubit routing is correct
+
+---
+
+
