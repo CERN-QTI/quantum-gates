@@ -1,6 +1,8 @@
 import pytest
 import numpy as np
 from qiskit.quantum_info import Statevector
+from qiskit import QuantumCircuit, transpile
+from qiskit_ibm_runtime.fake_provider import FakeBrisbane
 
 from src.quantum_gates.utilities import (
     sv_normal_to_qiskit,
@@ -16,8 +18,8 @@ from src.quantum_gates.utilities import (
 # ---------------------------------------------------------------------------
 
 def _basis_state_normal(bitstring: str) -> np.ndarray:
-    """Return the normal-ordered basis state for a bitstring like '010'.
-    Normal ordering: q0 is MSB, so '010' → index 2."""
+    """Return the normal-ordered basis state for a bitstring like '01'.
+    Normal ordering: q0 is MSB, so '0100' → index 1."""
     n = len(bitstring)
     sv = np.zeros(2 ** n, dtype=complex)
     idx = int(bitstring, 2)
@@ -26,8 +28,8 @@ def _basis_state_normal(bitstring: str) -> np.ndarray:
 
 
 def _basis_state_qiskit(bitstring: str) -> np.ndarray:
-    """Return the Qiskit-ordered basis state for a bitstring like '010'.
-    Qiskit ordering: q0 is LSB, so '010' → reversed bitstring '010' → index 2
+    """Return the Qiskit-ordered basis state for a bitstring like '01'.
+    Qiskit ordering: q0 is LSB, so '0010' → index 2
     but with reversed bit significance."""
     n = len(bitstring)
     sv = np.zeros(2 ** n, dtype=complex)
@@ -104,18 +106,22 @@ def test_sv_qiskit_to_normal_zero_state():
     assert np.allclose(result, np.array([1, 0, 0, 0], dtype=complex))
 
 
-@pytest.mark.parametrize("bitstring,expected_normal_idx", [
-    ("00", 0),
-    ("01", 2),
-    ("10", 1),
-    ("11", 3),
+@pytest.mark.parametrize("bitstring,expected_normal_idx, expected_qiskit_idx", [
+    ("00", 0, 0),
+    ("01", 1, 2),
+    ("10", 2, 1),
+    ("11", 3, 3),
 ])
-def test_sv_qiskit_to_normal_two_qubit_basis_states(bitstring, expected_normal_idx):
+def test_sv_qiskit_to_normal_two_qubit_basis_states(bitstring, expected_normal_idx, expected_qiskit_idx):
     """Each 2-qubit Qiskit basis state should map to the correct normal index."""
     sv = _basis_state_qiskit(bitstring)
     result = sv_qiskit_to_normal(sv)
     assert result[expected_normal_idx] == pytest.approx(1.0), (
         f"Qiskit |{bitstring}⟩ should map to normal index {expected_normal_idx} "
+        f"but got {result}"
+    )
+    assert sv[expected_qiskit_idx] == pytest.approx(1.0), (
+        f"Qiskit |{bitstring}⟩ should map to qiskit index {expected_qiskit_idx} "
         f"but got {result}"
     )
 
@@ -141,7 +147,7 @@ def test_sv_qiskit_to_normal_invalid_length():
 def test_roundtrip_normal_to_qiskit_to_normal(n):
     """normal → qiskit → normal should be the identity for any statevector."""
     rng = np.random.default_rng(42)
-    sv = rng.complex_normal(size=2 ** n)
+    sv = rng.random(2 ** n) + 1j * rng.random(2 ** n)
     sv /= np.linalg.norm(sv)
     result = sv_qiskit_to_normal(sv_normal_to_qiskit(sv))
     assert np.allclose(result, sv, atol=1e-12), (
@@ -153,7 +159,7 @@ def test_roundtrip_normal_to_qiskit_to_normal(n):
 def test_roundtrip_qiskit_to_normal_to_qiskit(n):
     """qiskit → normal → qiskit should be the identity for any statevector."""
     rng = np.random.default_rng(99)
-    sv = rng.complex_normal(size=2 ** n)
+    sv = rng.random(2 ** n) + 1j * rng.random(2 ** n)
     sv /= np.linalg.norm(sv)
     result = sv_normal_to_qiskit(sv_qiskit_to_normal(sv))
     assert np.allclose(result, sv, atol=1e-12), (
@@ -187,7 +193,7 @@ def test_permute_qiskit_sv_to_logical_swap():
 def test_permute_qiskit_sv_to_logical_preserves_norm():
     """Permutation should preserve the norm."""
     rng = np.random.default_rng(7)
-    sv = rng.complex_normal(size=8)
+    sv = rng.random(8) + 1j * rng.random(8)
     sv /= np.linalg.norm(sv)
     result = permute_qiskit_sv_to_logical(sv, qubit_order=[2, 0, 1])
     assert np.sum(np.abs(result) ** 2) == pytest.approx(1.0, abs=1e-9)
@@ -227,7 +233,7 @@ def test_permute_normal_sv_to_logical_normal_swap():
 def test_permute_normal_sv_to_logical_normal_preserves_norm():
     """Permutation should preserve the norm."""
     rng = np.random.default_rng(13)
-    sv = rng.complex_normal(size=8)
+    sv = rng.random(8) + 1j * rng.random(8)
     sv /= np.linalg.norm(sv)
     result = permute_normal_sv_to_logical_normal(sv, qubit_order=[2, 0, 1])
     assert np.sum(np.abs(result) ** 2) == pytest.approx(1.0, abs=1e-9)
@@ -259,7 +265,7 @@ def test_permute_consistency_via_conversion(qubit_order):
     """
     n = len(qubit_order)
     rng = np.random.default_rng(42)
-    sv_normal = rng.complex_normal(size=2 ** n)
+    sv_normal = rng.random(2 ** n) + 1j * rng.random(2 ** n)
     sv_normal /= np.linalg.norm(sv_normal)
 
     # Path A
@@ -277,3 +283,119 @@ def test_permute_consistency_via_conversion(qubit_order):
         f"Path A probs: {np.abs(path_a)**2}\n"
         f"Path B probs: {np.abs(path_b)**2}"
     )
+
+
+# ===========================================================================
+# 7. extract_qubit_orders
+# ===========================================================================
+
+_backend = FakeBrisbane()
+_LAYOUT = [0, 1, 2, 3, 4]
+ 
+ 
+def _transpile(circ, nqubits):
+    return transpile(
+        circ,
+        backend=_backend,
+        initial_layout=_LAYOUT[:nqubits],
+        seed_transpiler=42,
+        optimization_level=0,
+    )
+ 
+ 
+def test_extract_qubit_orders_invalid_instruction_type():
+    """Should raise ValueError for unknown instruction_type."""
+    qc = QuantumCircuit(2, 2)
+    with pytest.raises(ValueError):
+        extract_qubit_orders(qc, instruction_type="invalid")
+ 
+ 
+def test_extract_qubit_orders_barrier_empty_when_no_save():
+    """Should return empty list when no save barriers are present."""
+    qc = QuantumCircuit(2, 2)
+    qc.h(0)
+    qc.barrier()   # regular barrier, no label
+    qc.measure(range(2), range(2))
+    t_circ = _transpile(qc, 2)
+    result = extract_qubit_orders(t_circ, instruction_type="barrier")
+    assert result == [], f"Expected [] but got {result}"
+ 
+ 
+def test_extract_qubit_orders_barrier_finds_save_labels():
+    """Should return one entry per save barrier with the correct label."""
+    nqubits = 2
+    qc = QuantumCircuit(nqubits, nqubits)
+    qc.barrier(label="save_sv_0")
+    qc.h(0)
+    qc.barrier(label="save_sv_1")
+    qc.measure(range(nqubits), range(nqubits))
+    t_circ = _transpile(qc, nqubits)
+ 
+    result = extract_qubit_orders(t_circ, instruction_type="barrier")
+    labels = [r[0] for r in result]
+ 
+    assert "save_sv_0" in labels, f"Expected 'save_sv_0' in {labels}"
+    assert "save_sv_1" in labels, f"Expected 'save_sv_1' in {labels}"
+ 
+ 
+def test_extract_qubit_orders_barrier_ignores_non_save_barriers():
+    """Regular barriers without 'save' in the label should be ignored."""
+    nqubits = 2
+    qc = QuantumCircuit(nqubits, nqubits)
+    qc.barrier()                      # no label → ignored
+    qc.barrier(label="sync")          # label without 'save' → ignored
+    qc.barrier(label="save_sv_0")     # should be found
+    qc.measure(range(nqubits), range(nqubits))
+    t_circ = _transpile(qc, nqubits)
+ 
+    result = extract_qubit_orders(t_circ, instruction_type="barrier")
+    assert len(result) == 1, f"Expected 1 entry but got {len(result)}: {result}"
+    assert result[0][0] == "save_sv_0"
+ 
+ 
+def test_extract_qubit_orders_barrier_qubit_indices_are_ints():
+    """Qubit order entries should be lists of integers."""
+    nqubits = 2
+    qc = QuantumCircuit(nqubits, nqubits)
+    qc.barrier(label="save_sv_0")
+    qc.measure(range(nqubits), range(nqubits))
+    t_circ = _transpile(qc, nqubits)
+ 
+    result = extract_qubit_orders(t_circ, instruction_type="barrier")
+    for label, qubit_order in result:
+        assert isinstance(qubit_order, list), \
+            f"qubit_order should be a list but got {type(qubit_order)}"
+        for idx in qubit_order:
+            assert isinstance(idx, int), \
+                f"qubit index should be int but got {type(idx)}: {idx}"
+ 
+ 
+@pytest.mark.parametrize("qubit_order", [[0, 1], [1, 0], [1, 2, 0], [2, 0, 1]])
+def test_permute_consistency_via_conversion(qubit_order):
+    """permute_normal then convert should equal convert then permute_qiskit.
+ 
+    Both paths should produce the same result:
+      Path A: permute_normal_sv_to_logical_normal → sv_normal_to_qiskit
+      Path B: sv_normal_to_qiskit → permute_qiskit_sv_to_logical
+    """
+    n = len(qubit_order)
+    rng = np.random.default_rng(42)
+    sv_normal = rng.random(2 ** n) + 1j * rng.random(2 ** n)
+    sv_normal /= np.linalg.norm(sv_normal)
+ 
+    # Path A
+    path_a = sv_normal_to_qiskit(
+        permute_normal_sv_to_logical_normal(sv_normal, qubit_order)
+    )
+ 
+    # Path B
+    path_b = permute_qiskit_sv_to_logical(
+        sv_normal_to_qiskit(sv_normal), qubit_order
+    )
+ 
+    assert np.allclose(np.abs(path_a) ** 2, np.abs(path_b) ** 2, atol=1e-9), (
+        f"Permutation paths A and B disagree for qubit_order={qubit_order}.\n"
+        f"Path A probs: {np.abs(path_a)**2}\n"
+        f"Path B probs: {np.abs(path_b)**2}"
+    )
+ 

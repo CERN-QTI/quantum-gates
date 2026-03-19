@@ -413,7 +413,10 @@ def extract_qubit_orders(
 
     results: List[Tuple[Optional[str], List[int]]] = []
 
-    for inst, qargs, cargs in transpiled.data:
+    for op in transpiled.data:
+        inst = op.operation
+        qargs = op.qubits
+        cargs = op.clbits
         
         if instruction_type == "barrier" and inst.name == "barrier":
             if inst.label is not None and 'save' in inst.label:
