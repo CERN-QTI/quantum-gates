@@ -13,7 +13,7 @@ from quantum_gates._simulation.circuit import EfficientCircuit
 from src.quantum_gates.utilities import DeviceParameters
 from quantum_gates.simulators import MrAndersonSimulator
 
-from quantum_gates.gates import (
+from src.quantum_gates.gates import (
     ScaledNoiseGates,
     CustomNoiseGates,
     CustomNoiseChannelsGates,

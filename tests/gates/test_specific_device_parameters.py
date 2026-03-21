@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from quantum_gates.gates import (
+from src.quantum_gates.gates import (
     SpecificNoiseGates,
     Gates,
     noise_free_gates,
