@@ -7,9 +7,6 @@ from src.quantum_gates.gates import (
     noise_free_gates,
 )
 
-# -----------------------------
-# Fixtures / shared args
-# -----------------------------
 
 x_args = dict(
     phi=np.pi / 2,
@@ -48,10 +45,6 @@ def _almost_equal(m1, m2, tol=1e-9):
     return np.allclose(m1, m2, atol=tol)
 
 
-# -----------------------------
-# Validation tests
-# -----------------------------
-
 def test_specific_noise_invalid_p():
     with pytest.raises(ValueError):
         SpecificNoiseGates(p_val=-0.1)
@@ -73,10 +66,6 @@ def test_specific_noise_none_allowed():
     g = SpecificNoiseGates(p_val=None, T1_val=None, T2_val=None)
     assert g is not None
 
-
-# -----------------------------
-# Override behavior
-# -----------------------------
 
 def test_specific_noise_independent_of_inputs():
     g = SpecificNoiseGates(p_val=0.02, T1_val=10e3, T2_val=5e3)
@@ -114,10 +103,6 @@ def test_specific_noise_partial_override_T_only():
     assert not _almost_equal(res1, res2)
 
 
-# -----------------------------
-# Consistency tests
-# -----------------------------
-
 def test_specific_noise_matches_gates_when_none():
     """If no overrides → should match base Gates exactly."""
     g_specific = SpecificNoiseGates()
@@ -140,10 +125,6 @@ def test_specific_noise_noiseless_limit():
 
     assert _almost_equal(res, ref)
 
-
-# -----------------------------
-# Two-qubit consistency
-# -----------------------------
 
 def test_specific_noise_two_qubit_override():
     """Override applies consistently to both qubits."""

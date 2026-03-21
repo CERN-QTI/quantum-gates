@@ -7,8 +7,6 @@ from qiskit_aer import AerSimulator
 from qiskit_ibm_runtime.fake_provider import FakeBrisbane
 from qiskit.circuit.controlflow import ControlFlowOp
 
-
-from quantum_gates._simulation.circuit import EfficientCircuit
 from quantum_gates._simulation.circuit import EfficientCircuit
 from src.quantum_gates.utilities import DeviceParameters
 from quantum_gates.simulators import MrAndersonSimulator
@@ -17,12 +15,9 @@ from src.quantum_gates.gates import (
     ScaledNoiseGates,
     CustomNoiseGates,
     CustomNoiseChannelsGates,
-    standard_gates,
     noise_free_gates
 )
 
-
-# ---------- helpers ----------
 
 def get_device_params(nqubit):
     qubits_layout = list(range(nqubit))
@@ -88,9 +83,7 @@ def build_deterministic_circuit_simple_cnot(N_q, N_m):
 
     return qc
 
-#########################################
-# ---------- ScaledNoiseGates ----------
-#########################################
+
 x_args = dict(phi=np.pi/2, p=0.01, T1=50e3, T2=30e3)
 
 single_args = dict(theta=np.pi/2, phi=np.pi/2, p=0.01, T1=50e3, T2=30e3)
@@ -166,6 +159,7 @@ def test_scaled_noise_changes_result():
 
     assert not np.allclose(res1, res2)
 
+
 @pytest.mark.parametrize("phi", np.linspace(0, np.pi, 6))
 def test_scaled_noise_x_sweep(phi):
     args = dict(phi=phi, p=0.02, T1=50e3, T2=30e3)
@@ -174,6 +168,7 @@ def test_scaled_noise_x_sweep(phi):
     res = g.X(**args)
 
     assert res.shape == (2, 2)
+
 
 @pytest.mark.parametrize("phi", np.linspace(0, np.pi, 6))
 def test_noiseless_consistency_scaled(phi):
@@ -185,7 +180,7 @@ def test_noiseless_consistency_scaled(phi):
 
     assert _distance(res, ref) < 1e-6
 
-# circuit tests with noise scaling
+
 def test_scaled_noiseless_matches_aer_circuit_0():
     """Noiseless simulator should match Aer exactly for deterministic circuit."""
     shots = 10
@@ -308,12 +303,6 @@ def test_scaled_noise_matches_aer_dominant_outcome():
 
     assert top_sim == top_aer
 
-
-
-
-#########################################
-# ---------- CustomNoiseGates ----------
-#########################################
 
 def test_custom_noise_limit_to_noiseless():
     """All scales → 0 ⇒ noiseless."""
@@ -653,11 +642,6 @@ def test_custom_noise_single_qubit(theta):
     assert res.shape == (2, 2)
 
 
-
-#################################################
-# ---------- CustomNoiseChannelsGates ----------
-#################################################
-
 def test_custom_noise_channels_dispatch():
     """Noiseless qubits should use NoiseFreeGates."""
     g = CustomNoiseChannelsGates(
@@ -759,7 +743,6 @@ def test_custom_noise_channels_deterministic():
     assert correct_outcome in counts
     assert counts[correct_outcome] == shots  # all outcomes should be correct
 
-    
 
 def test_custom_noise_channels_mid_qubit_protection():
     nqubit = 4
@@ -767,9 +750,7 @@ def test_custom_noise_channels_mid_qubit_protection():
 
     qc = build_deterministic_circuit_simple_cnot(nqubit, nqubit)
 
-    # -------------------------------
-    # Case 1: middle qubits noiseless
-    # -------------------------------
+    # Case middle qubits noiseless
     gates = CustomNoiseChannelsGates(
         noiseless_qubits=[1, 2],  # protect middle
         p_scale=1.0,
@@ -777,8 +758,7 @@ def test_custom_noise_channels_mid_qubit_protection():
         T2_scale=1.0,
     )
 
-     # --- Custom simulator ---
-    
+     # Custom simulator
     psi0 = zero_state(nqubit)
     device_param = get_device_params(nqubit)
 
@@ -814,15 +794,12 @@ def test_custom_noise_channels_mid_qubit_protection():
         assert bitstring[2] == "1"
 
 
-
 def test_custom_noise_channels_mid_qubit_protection_1():
     nqubit = 4
     shots = 100
     qc = build_deterministic_circuit_simple_cnot(nqubit, nqubit)
 
-    # -------------------------------
-    # Case 2: edge qubits noiseless
-    # -------------------------------
+    # Case Edge qubits noiseless
     gates = CustomNoiseChannelsGates(
         noiseless_qubits=[0, 3],  # protect edges
         p_scale=1.0,
@@ -869,12 +846,6 @@ def test_custom_noise_channels_mid_qubit_protection_1():
     assert len(middle_values) > 1
 
 
-
-
-# ============================================================
-# Pickle tests 
-# ============================================================
-
 def test_pickle_scaled_noise():
     pickle.dumps(ScaledNoiseGates(0.5))
 
@@ -887,10 +858,6 @@ def test_pickle_noise_channels():
     pickle.dumps(CustomNoiseChannelsGates([0, 1]))
 
 
-# ##############################################################
-# ---------- Comparison of Noise Classes ----------
-# ##############################################################
-
 def test_noiseless_matches_aer():
     """Noiseless simulator should match Aer exactly for deterministic circuit."""
     
@@ -898,14 +865,13 @@ def test_noiseless_matches_aer():
     nqubit = 4
     qc = build_deterministic_circuit_1(nqubit, nqubit)
 
-    # --- Aer ---
+    # Aer
     aer = AerSimulator()
     tqc = transpile(qc, aer)
     result = aer.run(tqc, shots=shots).result()
     counts_aer = result.get_counts()
 
-    # --- Custom simulator ---
-    
+    # Custom simulator
     psi0 = zero_state(nqubit)
     device_param = get_device_params(nqubit)
 
@@ -932,10 +898,6 @@ def test_noiseless_matches_aer():
 
     assert counts_sim["mid_counts"] == counts_aer
 
-
-
-
-# ---------- 2. NOISE INTRODUCES DIFFERENCE ----------
 
 def test_noise_changes_distribution():
     """Adding noise should deviate from Aer noiseless result."""
@@ -971,8 +933,6 @@ def test_noise_changes_distribution():
 
     assert dist > 0.0
 
-
-# ---------- 3. MORE NOISE → MORE DEVIATION ----------
 
 def test_increasing_noise_increases_distance():
     """Higher noise scaling should increase deviation from noiseless."""
@@ -1039,4 +999,3 @@ def test_custom_noise_scaling_effect():
 
     # physics check
     assert max(v_high) < max(v_low)
-
