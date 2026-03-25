@@ -51,69 +51,6 @@ This command installs the package in editable mode, allowing you to work directl
 make will be immediately available without the need to reinstall the package.
 
 
-### Statevector Readout via Labeled Barriers
-There are a few design choices in this library that intentionally differ from standard Qiskit behaviour. These are important to understand when comparing results or debugging simulations with statevector readouts.
-
-Statevector extraction is implemented using labeled barriers:
-
-```python
-circ.barrier(label="save_...")
-```
-
-This acts as a marker for when the simulator should record the statevector.
-
-**Why not use Qiskit’s `save_statevector`?**  
-Qiskit’s native `save_statevector` instruction does not survive the transpilation process, as it is not supported on real hardware. Using labeled barriers ensures compatibility with transpiled circuits and hardware-aware workflows.
-
----
-
-### Statevector Ordering Convention
-
-This library follows the **theoretical ("by-hand") convention** for tensor product ordering:
-
-- **This library (big-endian):**
-  - Qubit 0 is the **leftmost (most significant index)**
-  - Basis ordering:
-  $$|q_0 q_1\rangle = |00\rangle, |01\rangle, |10\rangle, |11\rangle$$
-
-- **Qiskit (little-endian):**
-  - Qubit 0 is the **rightmost (least significant index)** $|q_1 q_0\rangle $
-  - Basis ordering is effectively reversed
-
-Because of this, statevectors will **not directly match Qiskit outputs**.
-
-To convert between conventions, use:
-```python
-from quantum_gates.utilities import sv_normal_to_qiskit
-```
-
----
-
-### Transpiler-Induced Statevector Permutations
-
-Qiskit’s transpiler may **permute qubit ordering**, which affects statevectors but not density matrices (see https://github.com/Qiskit/qiskit/issues/5839).
-
-This can lead to mismatches even if ordering conventions are handled correctly.
-
-To fix this, we provide:
-
-```python
-from quantum_gates.utilities import permute_normal_sv_to_logical_normal
-```
-
-This utility restores the expected logical qubit ordering after transpilation.
-
----
-
-When comparing with Qiskit results, discrepancies typically arise from:
-
-- Different **endianness conventions**
-- **Transpiler qubit permutations**
-- Statevector extraction differences
-
-Make sure to apply the provided utilities when performing comparisons.
-
-
 ## Quickstart 
 You can find this quickstart implemented in the tutorial notebook [here](docs/tutorials/notebooks/tutorial_quantum_gates.ipynb).
 
@@ -292,6 +229,73 @@ thanks to optimized tensor contraction algorithms. We also provide various
 [quantum algorithms](https://quantum-gates.readthedocs.io/en/latest/quantum_algorithms.html) as circuits, and 
 scripts to run the circuits with the simulator, the IBM simulator, and a real IBM backend. Last, all functionality is 
 unit tested and one can get sample code from the unit tests.
+
+
+## Qiskit Support
+While the quantum-gates library works as a provider for Qiskit and is part of the Qiskit Community ecosystem, there are
+a few intentional differences to the Qiskit API described in this section.
+
+### Statevector Readout via Labeled Barriers
+There are a few design choices in this library that intentionally differ from standard Qiskit behaviour. These are important to understand when comparing results or debugging simulations with statevector readouts.
+
+Statevector extraction is implemented using labeled barriers:
+
+```python
+circ.barrier(label="save_...")
+```
+
+This acts as a marker for when the simulator should record the statevector.
+
+Why not use Qiskit’s `save_statevector`? Qiskit’s native `save_statevector` instruction does not survive the 
+transpilation process, as it is not supported on real hardware. Using labeled barriers ensures compatibility with transpiled circuits and hardware-aware workflows.
+
+---
+
+### Statevector Ordering Convention
+
+This library follows the theoretical ("by-hand") convention for tensor product ordering:
+
+- quantum-gates (big-endian)
+  - Qubit 0 is the leftmost (most significant index)
+  - Basis ordering:
+    $$|q_0 q_1\rangle = |00\rangle, |01\rangle, |10\rangle, |11\rangle$$
+
+- Qiskit (little-endian):
+  - Qubit 0 is the rightmost (least significant index) $|q_1 q_0\rangle $
+  - Basis ordering is effectively reversed
+
+Because of this, statevectors will **not directly match Qiskit outputs**.
+
+To convert between conventions, use:
+```python
+from quantum_gates.utilities import sv_normal_to_qiskit
+```
+
+---
+
+### Transpiler-Induced Statevector Permutations
+
+Qiskit’s transpiler may permute qubit ordering, which affects statevectors but not density matrices (see https://github.com/Qiskit/qiskit/issues/5839).
+
+This can lead to mismatches even if ordering conventions are handled correctly.
+
+To fix this, we provide:
+
+```python
+from quantum_gates.utilities import permute_normal_sv_to_logical_normal
+```
+
+This utility restores the expected logical qubit ordering after transpilation.
+
+---
+
+When comparing with Qiskit results, discrepancies typically arise from:
+
+- Different endianness conventions
+- Transpiler qubit permutations
+- Statevector extraction differences
+
+Make sure to apply the provided utilities when performing comparisons.
 
 
 # Unit Tests
