@@ -3,7 +3,6 @@ import multiprocessing
 import json
 import os
 import concurrent.futures
-from typing import Union, List, Tuple, Optional
 
 from qiskit import transpile, QuantumCircuit
 from qiskit_aer import AerSimulator
@@ -306,7 +305,7 @@ def pretty_print_data(data):
                         f"clbits={[c._index for c in op.clbits]}"
                     )
 
-def sv_normal_to_qiskit(sv: Union[np.ndarray, Statevector]) -> np.ndarray:
+def sv_normal_to_qiskit(sv: np.ndarray | Statevector) -> np.ndarray:
 
     """
     Convert a statevector from 'normal' ordering (q0 is  - big endian notation)
@@ -346,7 +345,7 @@ def sv_normal_to_qiskit(sv: Union[np.ndarray, Statevector]) -> np.ndarray:
     return tensor_qiskit.reshape(-1)
 
 
-def sv_qiskit_to_normal(sv: Union[np.ndarray, Statevector]) -> np.ndarray:
+def sv_qiskit_to_normal(sv: np.ndarray | Statevector) -> np.ndarray:
     """
     Convert a statevector from Qiskit ordering (q0 is LSB - little endian notation)
     back into 'normal' ordering (q0 is MSB - big endian notation).
@@ -388,7 +387,7 @@ def sv_qiskit_to_normal(sv: Union[np.ndarray, Statevector]) -> np.ndarray:
 def extract_qubit_orders(
     transpiled: QuantumCircuit,
     instruction_type: str
-) -> List[Tuple[Optional[str], List[int]]]:
+) -> list[tuple[str | None, list[int]]]:
     """
     Extract qubit ordering for *either* 'save_statevector' or
     *barriers whose label contains 'save'*.
@@ -402,7 +401,7 @@ def extract_qubit_orders(
 
     Returns
     -------
-    List[Tuple[label, qubit_order]]
+    list[tuple[label, qubit_order]]
         label       : label of the instruction (or None)
         qubit_order : physical qubit indices at that point
     """
@@ -411,7 +410,7 @@ def extract_qubit_orders(
     if instruction_type not in ("save_statevector", "barrier"):
         raise ValueError("instruction_type must be either 'save_statevector' or 'barrier'.")
 
-    results: List[Tuple[Optional[str], List[int]]] = []
+    results: list[tuple[str | None, list[int]]] = []
 
     for op in transpiled.data:
         inst = op.operation
@@ -434,7 +433,7 @@ def extract_qubit_orders(
 
 def permute_qiskit_sv_to_logical(
     qiskit_order_sv: np.ndarray,
-    qubit_order: List[int]
+    qubit_order: list[int]
 ) -> np.ndarray:
     """
     Reorder a Qiskit-style statevector from *physical qubit order*
@@ -450,7 +449,7 @@ def permute_qiskit_sv_to_logical(
     qiskit_order_sv : np.ndarray
         Statevector in Qiskit's physical qubit order.
 
-    qubit_order : List[int]
+    qubit_order : list[int]
         Mapping: logical_qubit → physical_qubit.
         Example:
             qubit_order = [2, 0, 1]
@@ -490,7 +489,7 @@ def permute_qiskit_sv_to_logical(
 
 def permute_normal_sv_to_logical_normal(
     normal_order_sv: np.ndarray,
-    qubit_order: List[int]
+    qubit_order: list[int]
 ) -> np.ndarray:
     """
     Permute a *normal-ordered* statevector (MSB-first) from physical qubit
@@ -507,7 +506,7 @@ def permute_normal_sv_to_logical_normal(
     normal_order_sv : np.ndarray
         Statevector in physical *normal* ordering (MSB-first).
 
-    qubit_order : List[int]
+    qubit_order : list[int]
         Mapping: logical_qubit → physical_qubit index.
         Example: [2, 0, 1] means:
             logical q0 = physical q2

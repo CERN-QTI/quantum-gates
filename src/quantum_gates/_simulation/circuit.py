@@ -652,21 +652,41 @@ class AlternativeCircuit(object):
 
         return psi, result
 
+    def _apply_phase_to_qubit(self, psi: np.array, qubit: int, dim: int, n: int) -> np.array:
+        """Apply a phase rotation to a single qubit in the statevector.
+
+        Args:
+            psi: The statevector to modify.
+            qubit: The index of the qubit to apply the phase to.
+            dim: The dimension of the statevector (2^n).
+            n: The number of qubits.
+
+        Returns:
+            The modified statevector with the phase applied.
+        """
+        phase = self.phi[qubit]
+        for idx in range(dim):
+            bit = (idx >> (n - 1 - qubit)) & 1
+            if bit == 1:
+                psi[idx] *= np.exp(1j * phase)
+        return psi
     
-    def statevector_readout(self, psi0) -> np.array:
-        
+    def statevector_readout(self, psi0: np.array) -> np.array:
+        """Read out the statevector after applying per-qubit phase corrections.
+
+        Args:
+            psi0: The input statevector of shape (2^n,).
+
+        Returns:
+            A new statevector with phase corrections applied to each qubit.
+        """
         psi = psi0.copy()
-    
         dim = len(psi)
         n = int(np.log2(dim))
 
         for qubit in range(n):
             if self.phi[qubit] != 0:
-                phase = self.phi[qubit]
-                for idx in range(dim):
-                    bit = (idx >> (n - 1 - qubit)) & 1
-                    if bit == 1:
-                        psi[idx] *= np.exp(1j * phase)
+                psi = self._apply_phase_to_qubit(psi, qubit, dim, n)
         
         return psi
     
