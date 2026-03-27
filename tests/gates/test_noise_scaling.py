@@ -46,6 +46,7 @@ def zero_state(nqubit):
     return psi
 
 
+# Arrange test circuits
 def build_deterministic_circuit_0():
     """Simple deterministic circuit: |00> → X → measure → always '10'"""
     qc = QuantumCircuit(2, 2)
@@ -71,7 +72,6 @@ def build_deterministic_circuit_1(N_q, N_m):
 
     return qc
 
-
 def build_deterministic_circuit_simple_cnot(N_q, N_m):
     """ deterministic circuit:"""
     qc = QuantumCircuit(N_q, N_m)
@@ -83,7 +83,7 @@ def build_deterministic_circuit_simple_cnot(N_q, N_m):
 
     return qc
 
-
+# Arrange - test arguments
 x_args = dict(phi=np.pi/2, p=0.01, T1=50e3, T2=30e3)
 
 single_args = dict(theta=np.pi/2, phi=np.pi/2, p=0.01, T1=50e3, T2=30e3)
@@ -101,46 +101,40 @@ twoq_args = dict(
     T2_trg=30e3,
 )
 
+
 def test_scaled_noise_limit_to_noiseless():
     """Scaling → 0 should match noiseless."""
-    g = ScaledNoiseGates(noise_scaling=1e-12)
-
-    res = g.X(**x_args)
+    g = ScaledNoiseGates(noise_scaling=1e-12) # Arrange - noise near 0
+    res = g.X(**x_args)                 # Act - apply to X gate
     ref = noise_free_gates.X(**x_args)
-
-    assert _distance(res, ref) < 1e-6
+    assert _distance(res, ref) < 1e-6  # Assert - compare to noise free X
 
 
 def test_scaled_noise_monotonic():
     """Lower scaling → closer to noiseless."""
-    g_high = ScaledNoiseGates(1.0)
-    g_low = ScaledNoiseGates(0.1)
+    g_high = ScaledNoiseGates(1.0)   # Arrange - higher noise scaling
+    g_low = ScaledNoiseGates(0.1)    # Arrange - lower noise scaling
     np.random.seed(12)
-    res_high = g_high.X(**x_args)   
+    res_high = g_high.X(**x_args)    # Act - apply high noise
     np.random.seed(12)
-    res_low = g_low.X(**x_args)
-    ref = noise_free_gates.X(**x_args)
-
-    assert _distance(res_low, ref) < _distance(res_high, ref)
+    res_low = g_low.X(**x_args)      # Act - apply low noise
+    ref = noise_free_gates.X(**x_args)  
+    assert _distance(res_low, ref) < _distance(res_high, ref)  # Assert - lower noise closer to ref
 
 
 def test_scaled_noise_monotonic_sweep():
     """Lower noise scaling should monotonically approach noiseless gate."""
-    np.random.seed(0)
-
-    scales = [1.0, 0.5, 0.2, 0.1, 0.05]
-    ref = noise_free_gates.X(**x_args)
-
-    distances = []
-
+    np.random.seed(0)  # Arrange - fix randomness for reproducibility
+    scales = [1.0, 0.5, 0.2, 0.1, 0.05]  # Arrange - noise scaling values
+    ref = noise_free_gates.X(**x_args)   # Arrange - noiseless reference
+    distances = []  # Arrange - store distances to reference
     for s in scales:
-        np.random.seed(0)  # ensure comparable sampling
-        g = ScaledNoiseGates(s)
-        res = g.X(**x_args)
-        d = _distance(res, ref)
+        np.random.seed(0)                
+        g = ScaledNoiseGates(s)          # Arrange - set scaling
+        res = g.X(**x_args)              # Act - apply noisy gate
+        d = _distance(res, ref)          # Act - compute distance
         distances.append(d)
-
-    # Check monotonic decrease
+    # Assert - check monotonic decrease
     for i in range(len(distances) - 1):
         assert distances[i+1] <= distances[i], \
             f"Scaling not monotonic: {distances}"
@@ -148,46 +142,38 @@ def test_scaled_noise_monotonic_sweep():
 
 def test_scaled_noise_changes_result():
     """Scaling should actually affect the gate."""
-    
-    g1 = ScaledNoiseGates(noise_scaling=1.0)
+    g1 = ScaledNoiseGates(noise_scaling=1.0) # Arrange - noise scaling
     g2 = ScaledNoiseGates(noise_scaling=0.2)
-
     args = dict(phi=np.pi/2, p=0.05, T1=50e3, T2=30e3)
-
-    res1 = g1.X(**args)
+    res1 = g1.X(**args)                     # Act - apply noisy gate
     res2 = g2.X(**args)
-
     assert not np.allclose(res1, res2)
 
 
 @pytest.mark.parametrize("phi", np.linspace(0, np.pi, 6))
 def test_scaled_noise_x_sweep(phi):
     args = dict(phi=phi, p=0.02, T1=50e3, T2=30e3)
-
     g = ScaledNoiseGates(0.5)
     res = g.X(**args)
-
     assert res.shape == (2, 2)
 
 
 @pytest.mark.parametrize("phi", np.linspace(0, np.pi, 6))
 def test_noiseless_consistency_scaled(phi):
     args = dict(phi=phi, p=0.0, T1=1e12, T2=1e12)
-
     g = ScaledNoiseGates(1.0)
     res = g.X(**args)
     ref = noise_free_gates.X(**args)
-
     assert _distance(res, ref) < 1e-6
 
 
 def test_scaled_noiseless_matches_aer_circuit_0():
     """Noiseless simulator should match Aer exactly for deterministic circuit."""
     shots = 10
-    qc = build_deterministic_circuit_0()
+    qc = build_deterministic_circuit_0() # Arrange - Build circuit
     np.random.seed(42)
-    # --- Aer ---
-    aer = AerSimulator()
+    # --- Aer ---                       
+    aer = AerSimulator()    
     tqc = transpile(qc, aer)
     result = aer.run(tqc, shots=shots).result()
     counts_aer = result.get_counts()
@@ -195,7 +181,7 @@ def test_scaled_noiseless_matches_aer_circuit_0():
     # --- Custom simulator ---
     nqubit = 2
     psi0 = zero_state(nqubit)
-    device_param = get_device_params(nqubit)
+    device_param = get_device_params(nqubit) # Act - get the noisy circuit
     noisy_gates = ScaledNoiseGates(noise_scaling=1e-15)
     sim = MrAndersonSimulator(gates=noisy_gates)
 
@@ -253,7 +239,6 @@ def test_scaled_noiseless_matches_aer_circuit_1():
 # same idea but only compare dominant outcome to avoid shot noise issues with low shots
 def test_scaled_noise_matches_aer_dominant_outcome():
     """With low noise, dominant measurement outcome should match Aer."""
-
     shots = 100  # increase shots for stability
     nqubit = 4
     qc = build_deterministic_circuit_1(nqubit, nqubit)
@@ -261,13 +246,12 @@ def test_scaled_noise_matches_aer_dominant_outcome():
     # --- Custom simulator ---
     psi0 = zero_state(nqubit)
     device_param = get_device_params(nqubit)
-
     noisy_gates = ScaledNoiseGates(noise_scaling=1)  # device noise
     sim = MrAndersonSimulator(gates=noisy_gates)
-
     backend = FakeBrisbane()
     qubits_layout = list(range(nqubit))
 
+    # Transpile circuit
     needs_controlflow = any(isinstance(op.operation, ControlFlowOp) for op in qc.data)
 
     t_circ = transpile(
@@ -277,7 +261,7 @@ def test_scaled_noise_matches_aer_dominant_outcome():
         seed_transpiler=42,
         **({} if needs_controlflow else {"scheduling_method": "asap"})
     )
-
+    
     res = sim.run(
         t_qiskit_circ=t_circ,
         psi0=psi0,
@@ -304,21 +288,16 @@ def test_scaled_noise_matches_aer_dominant_outcome():
 def test_custom_noise_limit_to_noiseless():
     """All scales → 0 ⇒ noiseless."""
     g = CustomNoiseGates(p_scale=1e-12, T1_scale=1e-12, T2_scale=1e-12)
-
     res = g.X(**x_args)
     ref = noise_free_gates.X(**x_args)
-
     assert _distance(res, ref) < 1e-6
+
 
 def test_custom_noise_scaling_independent():
     """Ensure independent scaling does not crash and returns valid matrix."""
-    
     g = CustomNoiseGates(p_scale=0.1, T1_scale=2.0, T2_scale=3.0)
-
     args = dict(phi=np.pi/2, p=0.05, T1=100.0, T2=80.0)
-
     res = g.X(**args)
-
     assert res.shape == (2, 2)
 
 
@@ -963,7 +942,6 @@ def test_increasing_noise_increases_distance():
     assert err_high > err_low
 
 
-# ---------- 4. CUSTOM NOISE CLASS ----------
 
 def test_custom_noise_scaling_effect():
     """CustomNoiseGates should affect output distribution."""

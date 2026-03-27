@@ -795,7 +795,7 @@ class AlternativeCircuit(object):
             # Control i
             self._mp[i] = self._gate_call(
                 self.gates.CNOT_inv,
-                self.phi[k], self.phi[i], t_int, p_i_k, p_i, p_k, T1_ctr, T2_ctr, T1_trg, T2_trg, ctr_index=k, trg_index=i
+                self.phi[i], self.phi[k], t_int, p_i_k, p_i, p_k, T1_ctr, T2_ctr, T1_trg, T2_trg, ctr_index=k, trg_index=i
             )
 
             self.phi[i] = self.phi[i] + np.pi/2 + np.pi
