@@ -62,37 +62,37 @@ class Gates:
         self.ecr_c = ECRFactory(self.integrator)
         self.ecr_inv_c = ECRInvFactory(self.integrator)
 
-    def relaxation(self, Dt, T1, T2) -> np.array:
+    def relaxation(self, Dt, T1, T2, *, qubit_index=None) -> np.array:
         return self.relaxation_c.construct(Dt, T1, T2)
 
-    def bitflip(self, Dt, p) -> np.array:
+    def bitflip(self, Dt, p, *, qubit_index=None) -> np.array:
         return self.bitflip_c.construct(Dt, p)
 
-    def depolarizing(self, Dt, p) -> np.array:
+    def depolarizing(self, Dt, p, *, qubit_index=None) -> np.array:
         return self.depolarizing_c.construct(Dt, p)
 
-    def single_qubit_gate(self, theta, phi, p, T1, T2) -> np.array:
+    def single_qubit_gate(self, theta, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self.single_qubit_gate_c.construct(theta, phi, p, T1, T2)
 
-    def X(self, phi, p, T1, T2) -> np.array:
+    def X(self, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self.x_c.construct(phi, p, T1, T2)
 
-    def SX(self, phi, p, T1, T2) -> np.array:
+    def SX(self, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self.sx_c.construct(phi, p, T1, T2)
 
-    def CR(self, theta, phi, t_cr, p_cr, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def CR(self, theta, phi, t_cr, p_cr, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         return self.cr_c.construct(theta, phi, t_cr, p_cr, T1_ctr, T2_ctr, T1_trg, T2_trg)
 
-    def CNOT(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def CNOT(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         return self.cnot_c.construct(phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg)
 
-    def CNOT_inv(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def CNOT_inv(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         return self.cnot_inv_c.construct(phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg)
     
-    def ECR(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def ECR(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         return self.ecr_c.construct(phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg)
     
-    def ECR_inv(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def ECR_inv(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         return self.ecr_inv_c.construct(phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg)
 
 
@@ -110,19 +110,19 @@ class NoiseFreeGates(object):
            sampled_x = gateset.X(phi, p, T1, T2)
     """
 
-    def relaxation(self, Dt, T1, T2) -> np.array:
+    def relaxation(self, Dt, T1, T2, *, qubit_index=None) -> np.array:
         """ Returns single qubit relaxation in noise free regime -> identity. """
         return np.eye(2)
 
-    def bitflip(self, Dt, p) -> np.array:
+    def bitflip(self, Dt, p, *, qubit_index=None) -> np.array:
         """ Returns single qubit bitflip in noise free regime -> identity. """
         return np.eye(2)
 
-    def depolarizing(self, Dt, p) -> np.array:
+    def depolarizing(self, Dt, p, *, qubit_index=None) -> np.array:
         """ Returns single qubit depolarizing in noise free regime -> identity. """
         return np.eye(2)
 
-    def single_qubit_gate(self, theta, phi, p, T1, T2):
+    def single_qubit_gate(self, theta, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         """ Returns general single qubit gate in noise free regime. """
         U = np.array(
             [[np.cos(theta/2), - 1J * np.sin(theta/2) * np.exp(-1J * phi)],
@@ -130,7 +130,7 @@ class NoiseFreeGates(object):
         )
         return U
 
-    def X(self, phi, p, T1, T2) -> np.array:
+    def X(self, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         """ Returns X gate in noise free regime. """
         theta = np.pi
         U = np.array(
@@ -139,7 +139,7 @@ class NoiseFreeGates(object):
         )
         return U
 
-    def SX(self, phi, p, T1, T2) -> np.array:
+    def SX(self, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         """ Returns SX gate in noise free regime. """
         theta = np.pi / 2
         U = np.array(
@@ -148,7 +148,7 @@ class NoiseFreeGates(object):
         )
         return U
 
-    def CNOT(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def CNOT(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         """ Returns CNOT gate in noise free regime. """
         # Constants
         tg = 35*10**(-9)
@@ -165,7 +165,7 @@ class NoiseFreeGates(object):
 
         return first_cr @ np.kron(x_gate, relaxation_gate) @ second_cr @ np.kron(Y_Rz, sx_gate)
 
-    def CNOT_inv(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def CNOT_inv(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         """ Returns CNOT inverse gate in noise free regime. """
         # Constants
         tg = 35*10**(-9)
@@ -185,7 +185,7 @@ class NoiseFreeGates(object):
         result = np.kron(Ry, first_sx_gate) @ first_cr @ np.kron(x_gate, relaxation_gate) @ second_cr @ np.kron(second_sx_gate, Y_Z)
         return result
 
-    def CR(self, theta, phi, t_cr, p_cr, T1_ctr, T2_ctr, T1_trg, T2_trg):
+    def CR(self, theta, phi, t_cr, p_cr, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         """ Returns CR gate in noise free regime. """
         return np.array(
             [[np.cos(theta/2), -1J*np.sin(theta/2) * np.exp(-1J * phi), 0, 0],
@@ -194,7 +194,7 @@ class NoiseFreeGates(object):
              [0, 0, 1J*np.sin(theta/2) * np.exp(1J * phi), np.cos(theta/2)]]
         )
     
-    def ECR(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def ECR(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         """ Returns ECR gate in noise free regime. """
         # Constants
         tg = 35*10**(-9)
@@ -210,7 +210,7 @@ class NoiseFreeGates(object):
         return first_cr @ np.kron(x_gate, relaxation_gate) @ second_cr 
     
 
-    def ECR_inv(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def ECR_inv(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         """ Returns ECR inverse gate in noise free regime. """
         # Constants
         tg = 35*10**(-9)
@@ -319,20 +319,20 @@ class ScaledNoiseGates(NoiseScalingMixin):
         self.noise_scaling = noise_scaling
         self.gates = Gates(pulse)
 
-    def relaxation(self, Dt, T1, T2) -> np.array:
+    def relaxation(self, Dt, T1, T2, *, qubit_index=None) -> np.array:
             return self.gates.relaxation(
                 Dt,
                 self.scale_T(T1, self.noise_scaling),
                 self.scale_T(T2, self.noise_scaling),
             )
 
-    def bitflip(self, Dt, p) -> np.array:
+    def bitflip(self, Dt, p, *, qubit_index=None) -> np.array:
         return self.gates.bitflip(Dt, self.scale_p(p, self.noise_scaling))
 
-    def depolarizing(self, Dt, p) -> np.array:
+    def depolarizing(self, Dt, p, *, qubit_index=None) -> np.array:
         return self.gates.depolarizing(Dt, self.scale_p(p, self.noise_scaling))
 
-    def single_qubit_gate(self, theta, phi, p, T1, T2) -> np.array:
+    def single_qubit_gate(self, theta, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self.gates.single_qubit_gate(
             theta,
             phi,
@@ -341,13 +341,13 @@ class ScaledNoiseGates(NoiseScalingMixin):
             self.scale_T(T2, self.noise_scaling)
         )
 
-    def X(self, phi, p, T1, T2) -> np.array:
+    def X(self, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self.gates.X(phi, self.scale_p(p, self.noise_scaling), self.scale_T(T1, self.noise_scaling), self.scale_T(T2, self.noise_scaling))
 
-    def SX(self, phi, p, T1, T2) -> np.array:
+    def SX(self, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self.gates.SX(phi, self.scale_p(p, self.noise_scaling), self.scale_T(T1, self.noise_scaling), self.scale_T(T2, self.noise_scaling))
 
-    def CR(self, theta, phi, t_cr, p_cr, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def CR(self, theta, phi, t_cr, p_cr, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         return self.gates.CR(
             theta,
             phi,
@@ -359,7 +359,7 @@ class ScaledNoiseGates(NoiseScalingMixin):
             self.scale_T(T2_trg, self.noise_scaling)
         )
 
-    def CNOT(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def CNOT(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         return self.gates.CNOT(
             phi_ctr,
             phi_trg,
@@ -373,7 +373,7 @@ class ScaledNoiseGates(NoiseScalingMixin):
             self.scale_T(T2_trg, self.noise_scaling)
         )
 
-    def CNOT_inv(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def CNOT_inv(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         return self.gates.CNOT_inv(
             phi_ctr,
             phi_trg,
@@ -387,7 +387,7 @@ class ScaledNoiseGates(NoiseScalingMixin):
             self.scale_T(T2_trg, self.noise_scaling)
         )
     
-    def ECR(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def ECR(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg,*, ctr_index=None, trg_index=None) -> np.array:
         return self.gates.ECR(
             phi_ctr,
             phi_trg,
@@ -401,7 +401,7 @@ class ScaledNoiseGates(NoiseScalingMixin):
             self.scale_T(T2_trg, self.noise_scaling)
         )
     
-    def ECR_inv(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def ECR_inv(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         return self.gates.ECR_inv(
             phi_ctr,
             phi_trg,
@@ -459,16 +459,16 @@ class CustomNoiseGates(NoiseScalingMixin):
         # --- gate factory ---
         self.gates = Gates(pulse)
 
-    def relaxation(self, Dt, T1, T2) -> np.array:
+    def relaxation(self, Dt, T1, T2, *, qubit_index=None) -> np.array:
         return self.gates.relaxation(Dt, self.scale_T(T1, self.T1_scale), self.scale_T(T2, self.T2_scale))
 
-    def bitflip(self, Dt, p) -> np.array:
+    def bitflip(self, Dt, p, *, qubit_index=None) -> np.array:
         return self.gates.bitflip(Dt, self.scale_p(p, self.p_scale))
 
-    def depolarizing(self, Dt, p) -> np.array:
+    def depolarizing(self, Dt, p, *, qubit_index=None) -> np.array:
         return self.gates.depolarizing(Dt, self.scale_p(p, self.p_scale))
 
-    def single_qubit_gate(self, theta, phi, p, T1, T2) -> np.array:
+    def single_qubit_gate(self, theta, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self.gates.single_qubit_gate(
             theta,
             phi,
@@ -477,13 +477,13 @@ class CustomNoiseGates(NoiseScalingMixin):
             self.scale_T(T2, self.T2_scale)
         )
 
-    def X(self, phi, p, T1, T2) -> np.array:
+    def X(self, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self.gates.X(phi, self.scale_p(p, self.p_scale), self.scale_T(T1, self.T1_scale), self.scale_T(T2, self.T2_scale))
 
-    def SX(self, phi, p, T1, T2) -> np.array:
+    def SX(self, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self.gates.SX(phi, self.scale_p(p, self.p_scale), self.scale_T(T1, self.T1_scale), self.scale_T(T2, self.T2_scale))
 
-    def CR(self, theta, phi, t_cr, p_cr, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def CR(self, theta, phi, t_cr, p_cr, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         return self.gates.CR(
             theta,
             phi,
@@ -495,7 +495,7 @@ class CustomNoiseGates(NoiseScalingMixin):
             self.scale_T(T2_trg, self.T2_scale),
         )
 
-    def CNOT(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def CNOT(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         return self.gates.CNOT(
             phi_ctr,
             phi_trg,
@@ -509,7 +509,7 @@ class CustomNoiseGates(NoiseScalingMixin):
             self.scale_T(T2_trg, self.T2_scale),
         )
 
-    def CNOT_inv(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def CNOT_inv(self, phi_ctr, phi_trg, t_cnot, p_cnot, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         return self.gates.CNOT_inv(
             phi_ctr,
             phi_trg,
@@ -523,7 +523,7 @@ class CustomNoiseGates(NoiseScalingMixin):
             self.scale_T(T2_trg, self.T2_scale)
         )
     
-    def ECR(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def ECR(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         return self.gates.ECR(
             phi_ctr,
             phi_trg,
@@ -537,7 +537,7 @@ class CustomNoiseGates(NoiseScalingMixin):
             self.scale_T(T2_trg, self.T2_scale)
         )
     
-    def ECR_inv(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def ECR_inv(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         return self.gates.ECR_inv(
             phi_ctr,
             phi_trg,
@@ -620,17 +620,17 @@ class SpecificNoiseGates:
         return self.T2_val if self.T2_val is not None else T2
 
     # ---------- noise channels ----------
-    def relaxation(self, Dt, T1, T2):
+    def relaxation(self, Dt, T1, T2, *, qubit_index=None) -> np.array:
         return self.gates.relaxation(Dt, self._T1(T1), self._T2(T2))
 
-    def bitflip(self, Dt, p):
+    def bitflip(self, Dt, p, *, qubit_index=None) -> np.array:
         return self.gates.bitflip(Dt, self._p(p))
 
-    def depolarizing(self, Dt, p):
+    def depolarizing(self, Dt, p, *, qubit_index=None) -> np.array:
         return self.gates.depolarizing(Dt, self._p(p))
 
     # ---------- single-qubit gates ----------
-    def single_qubit_gate(self, theta, phi, p, T1, T2):
+    def single_qubit_gate(self, theta, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self.gates.single_qubit_gate(
             theta, phi,
             self._p(p),
@@ -638,15 +638,15 @@ class SpecificNoiseGates:
             self._T2(T2),
         )
 
-    def X(self, phi, p, T1, T2):
+    def X(self, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self.gates.X(phi, self._p(p), self._T1(T1), self._T2(T2))
         
 
-    def SX(self, phi, p, T1, T2):
+    def SX(self, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self.gates.SX(phi, self._p(p), self._T1(T1), self._T2(T2))
 
     # ---------- two-qubit gates ----------
-    def CR(self, theta, phi, t_cr, p_cr, T1_ctr, T2_ctr, T1_trg, T2_trg):
+    def CR(self, theta, phi, t_cr, p_cr, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         return self.gates.CR(
             theta, phi, t_cr,
             self._p(p_cr),
@@ -657,11 +657,12 @@ class SpecificNoiseGates:
         )
 
     def CNOT(
-        self,
-        phi_ctr, phi_trg, t_cnot, p_cnot,
-        p_single_ctr, p_single_trg,
-        T1_ctr, T2_ctr, T1_trg, T2_trg
-    ):
+        self, 
+        phi_ctr, phi_trg, t_cnot, p_cnot, 
+        p_single_ctr, p_single_trg, 
+        T1_ctr, T2_ctr, T1_trg, T2_trg, 
+        *, ctr_index=None, trg_index=None
+        ) -> np.array:
         return self.gates.CNOT(
             phi_ctr,
             phi_trg,
@@ -681,9 +682,13 @@ class SpecificNoiseGates:
             self._T2(T2_trg),
         )
 
-    def CNOT_inv(self, phi_ctr, phi_trg, t_cnot, p_cnot,
-                 p_single_ctr, p_single_trg,
-                 T1_ctr, T2_ctr, T1_trg, T2_trg):
+    def CNOT_inv(
+        self, 
+        phi_ctr, phi_trg, t_cnot, p_cnot,
+        p_single_ctr, p_single_trg,
+        T1_ctr, T2_ctr, T1_trg, T2_trg,
+        *, ctr_index=None, trg_index=None
+        )-> np.array:
         return self.gates.CNOT_inv(
             phi_ctr,
             phi_trg,
@@ -700,7 +705,13 @@ class SpecificNoiseGates:
             self._T2(T2_trg),
         )
     
-    def ECR(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def ECR(
+        self, 
+        phi_ctr, phi_trg, t_ecr, 
+        p_ecr, p_single_ctr, p_single_trg, 
+        T1_ctr, T2_ctr, T1_trg, T2_trg, 
+        *, ctr_index=None, trg_index=None
+        ) -> np.array:
         return self.gates.ECR(
             phi_ctr,
             phi_trg,
@@ -717,7 +728,14 @@ class SpecificNoiseGates:
             self._T2(T2_trg),
         )
     
-    def ECR_inv(self, phi_ctr, phi_trg, t_ecr, p_ecr, p_single_ctr, p_single_trg, T1_ctr, T2_ctr, T1_trg, T2_trg) -> np.array:
+    def ECR_inv(
+        self, 
+        phi_ctr, phi_trg, t_ecr, 
+        p_ecr, p_single_ctr, p_single_trg, 
+        T1_ctr, T2_ctr, T1_trg, T2_trg,
+        *, ctr_index=None, trg_index=None
+        ) -> np.array:
+        
         return self.gates.ECR_inv(
             phi_ctr,
             phi_trg,
@@ -801,26 +819,26 @@ class CustomNoiseChannelsGates(object):
 
     # ---------- single-qubit noise processes ----------
 
-    def relaxation(self, Dt, T1, T2, *, qubit_index=None):
+    def relaxation(self, Dt, T1, T2, *, qubit_index=None) -> np.array:
         return self._select(qubit_index).relaxation(Dt, T1, T2)
 
-    def bitflip(self, Dt, p, *, qubit_index=None):
+    def bitflip(self, Dt, p, *, qubit_index=None) -> np.array:
         return self._select(qubit_index).bitflip(Dt, p)
 
-    def depolarizing(self, Dt, p, *, qubit_index=None):
+    def depolarizing(self, Dt, p, *, qubit_index=None) -> np.array:
         return self._select(qubit_index).depolarizing(Dt, p)
 
     # ---------- single-qubit gates ----------
 
-    def single_qubit_gate(self, theta, phi, p, T1, T2, *, qubit_index=None):
+    def single_qubit_gate(self, theta, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self._select(qubit_index).single_qubit_gate(
             theta, phi, p, T1, T2
         )
 
-    def X(self, phi, p, T1, T2, *, qubit_index=None):
+    def X(self, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self._select(qubit_index).X(phi, p, T1, T2)
 
-    def SX(self, phi, p, T1, T2, *, qubit_index=None):
+    def SX(self, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self._select(qubit_index).SX(phi, p, T1, T2)
 
     # ---------- two-qubit gates ----------
@@ -833,7 +851,7 @@ class CustomNoiseChannelsGates(object):
         theta, phi, t_cr, p_cr,
         T1_ctr, T2_ctr, T1_trg, T2_trg,
         *, ctr_index=None, trg_index=None
-    ):
+    ) -> np.array:
         return self._select_two(ctr=ctr_index, trg=trg_index).CR(
             theta, phi, t_cr, p_cr,
             T1_ctr, T2_ctr, T1_trg, T2_trg
@@ -845,7 +863,7 @@ class CustomNoiseChannelsGates(object):
         p_cnot, p_single_ctr, p_single_trg,
         T1_ctr, T2_ctr, T1_trg, T2_trg,
         *, ctr_index=None, trg_index=None
-    ):
+    ) -> np.array:
         return self._select_two(ctr=ctr_index, trg=trg_index).CNOT(
             phi_ctr, phi_trg, t_cnot,
             p_cnot, p_single_ctr, p_single_trg,
@@ -858,7 +876,7 @@ class CustomNoiseChannelsGates(object):
         p_cnot, p_single_ctr, p_single_trg,
         T1_ctr, T2_ctr, T1_trg, T2_trg,
         *, ctr_index=None, trg_index=None
-    ):
+    ) -> np.array:
         return self._select_two(ctr=ctr_index, trg=trg_index).CNOT_inv(
             phi_ctr, phi_trg, t_cnot,
             p_cnot, p_single_ctr, p_single_trg,
@@ -871,7 +889,7 @@ class CustomNoiseChannelsGates(object):
         p_ecr, p_single_ctr, p_single_trg,
         T1_ctr, T2_ctr, T1_trg, T2_trg,
         *, ctr_index=None, trg_index=None
-    ):
+    ) -> np.array:
         return self._select_two(ctr=ctr_index, trg=trg_index).ECR(
             phi_ctr, phi_trg, t_ecr,
             p_ecr, p_single_ctr, p_single_trg,
@@ -884,7 +902,7 @@ class CustomNoiseChannelsGates(object):
         p_ecr, p_single_ctr, p_single_trg,
         T1_ctr, T2_ctr, T1_trg, T2_trg,
         *, ctr_index=None, trg_index=None
-    ):
+    ) -> np.array:
         return self._select_two(ctr=ctr_index, trg=trg_index).ECR_inv(
             phi_ctr, phi_trg, t_ecr,
             p_ecr, p_single_ctr, p_single_trg,
