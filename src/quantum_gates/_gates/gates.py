@@ -281,7 +281,7 @@ class NoiseScalingMixin:
 
         T_scaled = 1.0 / gamma_scaled
 
-        # --- clamp with warnings ---
+        # Clamp with warnings
         if T_scaled < min_T:
             warnings.warn(
                 f"scale_T: T_scaled too small ({T_scaled:.3e}) → clamped to {min_T}.",
@@ -434,7 +434,7 @@ class CustomNoiseGates(NoiseScalingMixin):
     """
 
     def __init__(self, p_scale: float = 1.0, T1_scale: float = 1.0, T2_scale: float = 1.0, pulse: Pulse=constant_pulse):
-        # --- validate p_scale ---
+        # Validate p_scale
         if not np.isfinite(p_scale):
             raise ValueError(f"p_scale must be finite, got {p_scale}")
         if p_scale < 0:
@@ -442,7 +442,7 @@ class CustomNoiseGates(NoiseScalingMixin):
         if p_scale > 1e3:
             raise ValueError(f"p_scale too large: {p_scale} > 1e3 (likely unphysical)")
 
-        # --- validate T1_scale / T2_scale ---
+        # Validate T1_scale / T2_scale
         for name, val in {"T1_scale": T1_scale, "T2_scale": T2_scale}.items():
             if not np.isfinite(val):
                 raise ValueError(f"{name} must be finite, got {val}")
@@ -451,12 +451,12 @@ class CustomNoiseGates(NoiseScalingMixin):
             if val > 1e6:
                 raise ValueError(f"{name} too large: {val} > 1e6 (unphysical regime)")
 
-        # --- store ---
+        # Store
         self.p_scale = float(p_scale)
         self.T1_scale = float(T1_scale)
         self.T2_scale = float(T2_scale)
 
-        # --- gate factory ---
+        # Gate factory
         self.gates = Gates(pulse)
 
     def relaxation(self, Dt, T1, T2, *, qubit_index=None) -> np.array:
@@ -576,7 +576,7 @@ class SpecificNoiseGates:
         T2_val: float | None = None,
         pulse: Pulse = constant_pulse,
     ):
-        # --- validation helper ---
+        # Validation helper
         def _validate_p(val):
             if val is None:
                 return
@@ -602,14 +602,14 @@ class SpecificNoiseGates:
         _validate_T("T1_val", T1_val)
         _validate_T("T2_val", T2_val)
 
-        # --- store overrides ---
+        # Store overrides
         self.p_val = p_val
         self.T1_val = T1_val
         self.T2_val = T2_val
 
         self.gates = Gates(pulse)
 
-    # ---------- helpers ----------
+    # Helpers
     def _p(self, p):
         return self.p_val if self.p_val is not None else p
 
@@ -619,7 +619,7 @@ class SpecificNoiseGates:
     def _T2(self, T2):
         return self.T2_val if self.T2_val is not None else T2
 
-    # ---------- noise channels ----------
+    # Noise channels
     def relaxation(self, Dt, T1, T2, *, qubit_index=None) -> np.array:
         return self.gates.relaxation(Dt, self._T1(T1), self._T2(T2))
 
@@ -629,7 +629,7 @@ class SpecificNoiseGates:
     def depolarizing(self, Dt, p, *, qubit_index=None) -> np.array:
         return self.gates.depolarizing(Dt, self._p(p))
 
-    # ---------- single-qubit gates ----------
+    # Single-qubit gates
     def single_qubit_gate(self, theta, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self.gates.single_qubit_gate(
             theta, phi,
@@ -645,7 +645,7 @@ class SpecificNoiseGates:
     def SX(self, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self.gates.SX(phi, self._p(p), self._T1(T1), self._T2(T2))
 
-    # ---------- two-qubit gates ----------
+    # Two-qubit gates
     def CR(self, theta, phi, t_cr, p_cr, T1_ctr, T2_ctr, T1_trg, T2_trg, *, ctr_index=None, trg_index=None) -> np.array:
         return self.gates.CR(
             theta, phi, t_cr,
@@ -668,14 +668,14 @@ class SpecificNoiseGates:
             phi_trg,
             t_cnot,
 
-            # --- ONLY override two-qubit noise ---
+            # Only override two-qubit noise
             self._p(p_cnot),
 
-            # --- KEEP single-qubit noise as-is ---
+            # Keep single-qubit noise as-is
             p_single_ctr,
             p_single_trg,
 
-            # --- still override decoherence ---
+            # Still override decoherence
             self._T1(T1_ctr),
             self._T2(T2_ctr),
             self._T1(T1_trg),
@@ -693,12 +693,12 @@ class SpecificNoiseGates:
             phi_ctr,
             phi_trg,
             t_cnot,
-            # --- ONLY override two-qubit noise ---
+            # Only override two-qubit noise
             self._p(p_cnot),
-            # --- KEEP single-qubit noise as-is ---
+            # Keep single-qubit noise as-is
             p_single_ctr,
             p_single_trg,
-            # --- still override decoherence ---
+            # Still override decoherence
             self._T1(T1_ctr),
             self._T2(T2_ctr),
             self._T1(T1_trg),
@@ -716,12 +716,12 @@ class SpecificNoiseGates:
             phi_ctr,
             phi_trg,
             t_ecr,
-            # --- ONLY override two-qubit noise ---
+            # Only override two-qubit noise
             self._p(p_ecr),
-            # --- KEEP single-qubit noise as-is ---
+            # Keep single-qubit noise as-is
             p_single_ctr,
             p_single_trg,
-            # --- still override decoherence ---
+            # Still override decoherence
             self._T1(T1_ctr),
             self._T2(T2_ctr),
             self._T1(T1_trg),
@@ -740,9 +740,9 @@ class SpecificNoiseGates:
             phi_ctr,
             phi_trg,
             t_ecr,
-            # --- ONLY override two-qubit noise ---
+            # Only override two-qubit noise
             self._p(p_ecr),
-            # --- KEEP single-qubit noise as-is ---
+            # Keep single-qubit noise as-is
             p_single_ctr,
             p_single_trg,   
             self._T1(T1_ctr),
@@ -770,7 +770,7 @@ class CustomNoiseChannelsGates(object):
         T2_scale=1.0,
         pulse=constant_pulse,
     ):
-        # --- validate noiseless_qubits ---
+        # Validate noiseless_qubits
         if noiseless_qubits is None:
             noiseless_qubits = []
 
@@ -779,7 +779,7 @@ class CustomNoiseChannelsGates(object):
 
         self.noiseless_qubits = set(noiseless_qubits)
 
-        # --- noise models ---
+        # Noise models
         self.noise_free = NoiseFreeGates()
         self.noisy = CustomNoiseGates(
             p_scale=p_scale,
@@ -789,11 +789,11 @@ class CustomNoiseChannelsGates(object):
         )
 
 
-    # ---------- internal dispatchers ----------
+    # Internal dispatchers
 
     def _select(self, qubit_index):
         if qubit_index is None:
-            # explicit fallback (debug-friendly)
+            # Explicit fallback (debug-friendly)
             return self.noisy
 
         if not isinstance(qubit_index, int):
@@ -817,7 +817,7 @@ class CustomNoiseChannelsGates(object):
         return self.noisy
     
 
-    # ---------- single-qubit noise processes ----------
+    # Single-qubit noise processes
 
     def relaxation(self, Dt, T1, T2, *, qubit_index=None) -> np.array:
         return self._select(qubit_index).relaxation(Dt, T1, T2)
@@ -828,7 +828,7 @@ class CustomNoiseChannelsGates(object):
     def depolarizing(self, Dt, p, *, qubit_index=None) -> np.array:
         return self._select(qubit_index).depolarizing(Dt, p)
 
-    # ---------- single-qubit gates ----------
+    # Single-qubit gates
 
     def single_qubit_gate(self, theta, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self._select(qubit_index).single_qubit_gate(
@@ -841,10 +841,9 @@ class CustomNoiseChannelsGates(object):
     def SX(self, phi, p, T1, T2, *, qubit_index=None) -> np.array:
         return self._select(qubit_index).SX(phi, p, T1, T2)
 
-    # ---------- two-qubit gates ----------
-    # physical channels depend on both control and target qubits, so we check both indices to determine noise level 
-    # if ctr in noiseless and trg in noiseless -> noise free CR
-    # else -> noisy CR
+    # Two-qubit gates
+    # Physical channels depend on both control and target qubits, so we check both indices to determine noise level.
+    # If ctr in noiseless and trg in noiseless -> noise free CR, else -> noisy CR.
 
     def CR(
         self,

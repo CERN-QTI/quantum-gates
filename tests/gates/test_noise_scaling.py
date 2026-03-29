@@ -172,13 +172,13 @@ def test_scaled_noiseless_matches_aer_circuit_0():
     shots = 10
     qc = build_deterministic_circuit_0() # Arrange - Build circuit
     np.random.seed(42)
-    # --- Aer ---                       
+    # Aer
     aer = AerSimulator()    
     tqc = transpile(qc, aer)
     result = aer.run(tqc, shots=shots).result()
     counts_aer = result.get_counts()
 
-    # --- Custom simulator ---
+    # Custom simulator
     nqubit = 2
     psi0 = zero_state(nqubit)
     device_param = get_device_params(nqubit) # Act - get the noisy circuit
@@ -202,7 +202,7 @@ def test_scaled_noiseless_matches_aer_circuit_1():
     nqubit = 4
     qc = build_deterministic_circuit_1(nqubit, nqubit)
 
-    # --- Custom simulator ---
+    # Custom simulator
     psi0 = zero_state(nqubit)
     device_param = get_device_params(nqubit)
     noisy_gates = ScaledNoiseGates(noise_scaling=1e-15)
@@ -229,21 +229,21 @@ def test_scaled_noiseless_matches_aer_circuit_1():
     nqubit=nqubit,
     )
 
-    # --- Aer ---
+    # Aer
     aer = AerSimulator()
     result = aer.run(t_circ, shots=shots).result()
     counts_aer = result.get_counts()
 
     assert counts_sim["mid_counts"] == counts_aer
 
-# same idea but only compare dominant outcome to avoid shot noise issues with low shots
+# Same idea but only compare dominant outcome to avoid shot noise issues with low shots.
 def test_scaled_noise_matches_aer_dominant_outcome():
     """With low noise, dominant measurement outcome should match Aer."""
     shots = 100  # increase shots for stability
     nqubit = 4
     qc = build_deterministic_circuit_1(nqubit, nqubit)
 
-    # --- Custom simulator ---
+    # Custom simulator
     psi0 = zero_state(nqubit)
     device_param = get_device_params(nqubit)
     noisy_gates = ScaledNoiseGates(noise_scaling=1)  # device noise
@@ -272,10 +272,10 @@ def test_scaled_noise_matches_aer_dominant_outcome():
 
     counts_sim = res["mid_counts"]
 
-    # compare dominant outcomes
+    # Compare dominant outcomes
     top_sim = max(counts_sim, key=counts_sim.get)
 
-    # --- Aer ---
+    # Aer
     aer = AerSimulator()
     result = aer.run(t_circ, shots=shots).result()
     counts_aer = result.get_counts()
@@ -716,7 +716,7 @@ def test_custom_noise_channels_deterministic():
 
     counts = res["mid_counts"]
 
-    # result format assumed: dict[str, int]
+    # Result format assumed: dict[str, int]
     assert correct_outcome in counts
     assert counts[correct_outcome] == shots  # all outcomes should be correct
 
@@ -766,7 +766,7 @@ def test_custom_noise_channels_mid_qubit_protection():
     counts = res["mid_counts"]
 
     for bitstring in counts:
-        # assume ordering "q0 q1 q2 q3"
+        # Assume ordering "q0 q1 q2 q3"
         assert bitstring[1] == "1"
         assert bitstring[2] == "1"
 
@@ -814,7 +814,7 @@ def test_custom_noise_channels_mid_qubit_protection_1():
     counts = res["mid_counts"]
 
     for bitstring in counts:
-        # edges should now be stable
+        # Edges should now be stable
         assert bitstring[0] in ["0", "1"]  # may depend on circuit
         assert bitstring[3] in ["0", "1"]
 
@@ -970,8 +970,8 @@ def test_custom_noise_scaling_effect():
     v_low = np.array([probs_low.get(k, 0) for k in all_keys])
     v_high = np.array([probs_high.get(k, 0) for k in all_keys])
 
-    # distributions differ
+    # Distributions differ
     assert not np.allclose(v_low, v_high)
 
-    # physics check
+    # Physics check
     assert max(v_high) < max(v_low)
