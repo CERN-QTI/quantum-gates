@@ -561,7 +561,7 @@ def apply_phase_to_qubit(psi: np.array, qubit: int, dim: int, n: int, phase: flo
         The modified statevector with the phase applied.
     """
     if not np.issubdtype(psi.dtype, np.complexfloating):
-        raise TypeError(f"psi must be a complex array, got dtype={psi.dtype}")
+        raise TypeError(f"Psi must be a complex array, got dtype={psi.dtype}")
     for idx in range(dim):
         bit = (idx >> (n - 1 - qubit)) & 1
         if bit == 1:

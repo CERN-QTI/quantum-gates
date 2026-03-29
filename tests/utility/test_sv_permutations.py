@@ -13,9 +13,9 @@ from src.quantum_gates.utilities import (
 )
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+_backend = FakeBrisbane()
+_LAYOUT = [0, 1, 2, 3, 4]
+
 
 def _basis_state_normal(bitstring: str) -> np.ndarray:
     """Return the normal-ordered basis state for a bitstring like '01'.
@@ -38,10 +38,6 @@ def _basis_state_qiskit(bitstring: str) -> np.ndarray:
     sv[idx] = 1.0
     return sv
 
-
-# ===========================================================================
-# 1. sv_normal_to_qiskit
-# ===========================================================================
 
 def test_sv_normal_to_qiskit_zero_state():
     """Normal |00⟩ should map to Qiskit |00⟩ — same index 0."""
@@ -120,10 +116,6 @@ def test_sv_normal_to_qiskit_invalid_length():
         sv_normal_to_qiskit(np.array([1, 0, 0], dtype=complex))
 
 
-# ===========================================================================
-# 2. sv_qiskit_to_normal
-# ===========================================================================
-
 def test_sv_qiskit_to_normal_zero_state():
     """Qiskit |00⟩ should map to normal |00⟩."""
     # Arrange
@@ -179,10 +171,6 @@ def test_sv_qiskit_to_normal_invalid_length():
         sv_qiskit_to_normal(np.array([1, 0, 0], dtype=complex))
 
 
-# ===========================================================================
-# 3. Roundtrip: normal → qiskit → normal and qiskit → normal → qiskit
-# ===========================================================================
-
 @pytest.mark.parametrize("n", [1, 2, 3, 4])
 def test_roundtrip_normal_to_qiskit_to_normal(n):
     """normal → qiskit → normal should be the identity for any statevector."""
@@ -216,10 +204,6 @@ def test_roundtrip_qiskit_to_normal_to_qiskit(n):
         f"Roundtrip qiskit→normal→qiskit failed for n={n}"
     )
 
-
-# ===========================================================================
-# 4. permute_qiskit_sv_to_logical
-# ===========================================================================
 
 def test_permute_qiskit_sv_to_logical_identity():
     """Identity permutation [0, 1] should leave the statevector unchanged."""
@@ -274,10 +258,6 @@ def test_permute_qiskit_sv_to_logical_three_qubits_cyclic():
     assert np.max(np.abs(result)) == pytest.approx(1.0, abs=1e-9)
     assert np.sum(np.abs(result) ** 2) == pytest.approx(1.0, abs=1e-9)
 
-
-# ===========================================================================
-# 5. permute_normal_sv_to_logical_normal
-# ===========================================================================
 
 def test_permute_normal_sv_to_logical_normal_identity():
     """Identity permutation [0, 1] should leave the statevector unchanged."""
@@ -336,10 +316,6 @@ def test_permute_normal_sv_to_logical_normal_three_qubits_basis():
         assert np.sum(np.abs(result) ** 2) == pytest.approx(1.0, abs=1e-9)
 
 
-# ===========================================================================
-# 6. Consistency between permute_qiskit and permute_normal via conversions
-# ===========================================================================
-
 @pytest.mark.parametrize("qubit_order", [[0, 1], [1, 0], [1, 2, 0], [2, 0, 1]])
 def test_permute_consistency_via_conversion(qubit_order):
     """permute_normal then convert should equal convert then permute_qiskit.
@@ -371,14 +347,6 @@ def test_permute_consistency_via_conversion(qubit_order):
         f"Path A probs: {np.abs(path_a)**2}\n"
         f"Path B probs: {np.abs(path_b)**2}"
     )
-
-
-# ===========================================================================
-# 7. extract_qubit_orders
-# ===========================================================================
-
-_backend = FakeBrisbane()
-_LAYOUT = [0, 1, 2, 3, 4]
  
  
 def _transpile(circ, nqubits):

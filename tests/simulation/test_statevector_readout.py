@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from qiskit import QuantumCircuit, transpile
+from qiskit import transpile
 from qiskit_ibm_runtime.fake_provider import FakeBrisbane
 from qiskit_aer import AerSimulator
 from qiskit.circuit import QuantumCircuit
