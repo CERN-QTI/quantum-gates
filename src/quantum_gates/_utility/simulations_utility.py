@@ -567,3 +567,27 @@ def apply_phase_to_qubit(psi: np.array, qubit: int, dim: int, n: int, phase: flo
         if bit == 1:
             psi[idx] *= np.exp(1j * phase)
     return psi
+
+
+def apply_phase_corrections(psi0: np.array, phases: list) -> np.array:
+    """Apply per-qubit phase corrections to a statevector.
+
+    Iterates over all qubits and applies the accumulated virtual-Z phase
+    for each qubit whose phase is non-zero. The input statevector is not
+    modified; a corrected copy is returned.
+
+    Args:
+        psi0: The input statevector of shape (2^n,).
+        phases: A list of length n containing the accumulated phase
+                (in radians) for each qubit.
+
+    Returns:
+        A new statevector with all phase corrections applied.
+    """
+    psi = psi0.copy()
+    dim = len(psi)
+    n = int(np.log2(dim))
+    for qubit in range(n):
+        if phases[qubit] != 0:
+            psi = apply_phase_to_qubit(psi, qubit, dim, n, phase=phases[qubit])
+    return psi

@@ -3,7 +3,7 @@ import os
 import pytest
 
 from src.quantum_gates.utilities import post_process_split
-from src.quantum_gates._utility.simulations_utility import apply_phase_to_qubit
+from src.quantum_gates._utility.simulations_utility import apply_phase_to_qubit, apply_phase_corrections
 
 
 location = 'tests/helpers/result_samples'
@@ -100,6 +100,99 @@ def test_apply_phase_to_qubit_2pi_is_identity():
 
     # Assert
     assert np.allclose(result, psi), f"Expected {psi} but got {result}."
+
+
+def test_apply_phase_corrections_no_phases_is_identity():
+    """All-zero phases leave the statevector unchanged."""
+    # Arrange
+    psi = np.array([0.5, 0.5j, -0.5, -0.5j])
+    expected = psi.copy()
+
+    # Act
+    result = apply_phase_corrections(psi, phases=[0.0, 0.0])
+
+    # Assert
+    assert np.allclose(result, expected), f"Expected {expected} but got {result}."
+
+
+def test_apply_phase_corrections_preserves_norm():
+    """Phase corrections preserve the L2 norm of the statevector."""
+    # Arrange
+    psi = np.array([0.5 + 0.1j, 0.3 - 0.2j, 0.4 + 0.3j, 0.1 - 0.5j])
+    psi /= np.linalg.norm(psi)  # normalize
+    phases = [np.pi / 3, 1.7]
+
+    # Act
+    result = apply_phase_corrections(psi, phases)
+
+    # Assert
+    assert abs(np.linalg.norm(result) - 1.0) < 1e-12, (
+        f"Expected unit norm but got {np.linalg.norm(result)}"
+    )
+
+
+def test_apply_phase_corrections_single_qubit():
+    """Single qubit in |1> with phase pi/4 gives exp(i*pi/4)."""
+    # Arrange
+    phase = np.pi / 4
+    psi = np.array([0.0 + 0j, 1.0 + 0j])  # |1>
+    expected = np.array([0.0, np.exp(1j * phase)])
+
+    # Act
+    result = apply_phase_corrections(psi, phases=[phase])
+
+    # Assert
+    assert np.allclose(result, expected), f"Expected {expected} but got {result}."
+
+
+def test_apply_phase_corrections_multi_qubit_selective():
+    """Phase on qubit 0 only; qubit 1 amplitudes are untouched."""
+    # Arrange
+    psi = np.array([0.5, 0.5, 0.5, 0.5], dtype=complex)
+    phase = np.pi / 2
+
+    # Act
+    result = apply_phase_corrections(psi, phases=[phase, 0.0])
+
+    # Assert — only indices 2 (|10>) and 3 (|11>) are rotated
+    expected = np.array([0.5, 0.5, 0.5 * np.exp(1j * phase), 0.5 * np.exp(1j * phase)])
+    assert np.allclose(result, expected), f"Expected {expected} but got {result}."
+
+
+def test_apply_phase_corrections_does_not_mutate_input():
+    """The original statevector must not be modified."""
+    # Arrange
+    psi = np.array([1 / np.sqrt(2), 1 / np.sqrt(2)], dtype=complex)
+    original = psi.copy()
+
+    # Act
+    apply_phase_corrections(psi, phases=[np.pi])
+
+    # Assert
+    assert np.array_equal(psi, original), "Input statevector was mutated."
+
+
+def test_apply_phase_corrections_matches_manual_loop():
+    """Cross-check: result must equal a manual apply_phase_to_qubit loop."""
+    # Arrange
+    rng = np.random.default_rng(42)
+    psi = rng.random(8) + 1j * rng.random(8)  # 3 qubits
+    psi /= np.linalg.norm(psi)
+    phases = [0.5, -1.2, np.pi]
+
+    # Act
+    result = apply_phase_corrections(psi, phases)
+
+    # Manual loop (the original inline code)
+    expected = psi.copy()
+    dim = len(expected)
+    n = 3
+    for qubit in range(n):
+        if phases[qubit] != 0:
+            expected = apply_phase_to_qubit(expected, qubit, dim, n, phase=phases[qubit])
+
+    # Assert
+    assert np.allclose(result, expected), f"Expected {expected} but got {result}."
 
 
 def test_post_process_split_mean():

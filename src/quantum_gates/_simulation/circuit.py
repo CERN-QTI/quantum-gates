@@ -6,7 +6,7 @@ import functools as ft
 
 from .._gates.gates import Gates
 from .backend import StandardBackend, EfficientBackend, BackendForOnes, BinaryBackend
-from .._utility.simulations_utility import apply_phase_to_qubit
+from .._utility.simulations_utility import apply_phase_to_qubit, apply_phase_corrections
 
 
 class Circuit(object):
@@ -669,15 +669,7 @@ class AlternativeCircuit(object):
         Returns:
             A new statevector with phase corrections applied to each qubit.
         """
-        psi = psi0.copy()
-        dim = len(psi)
-        n = int(np.log2(dim))
-
-        for qubit in range(n):
-            if self.phi[qubit] != 0:
-                psi = apply_phase_to_qubit(psi, qubit, dim, n, phase=self.phi[qubit])
-        
-        return psi
+        return apply_phase_corrections(psi0, self.phi)
 
     def I(self, i: int):
         """Apply identity gate on qubit i
@@ -1302,15 +1294,7 @@ class BinaryCircuit(object):
         Returns:
             A new statevector with phase corrections applied to each qubit.
         """
-        psi = psi0.copy()
-        dim = len(psi)
-        n = int(np.log2(dim))
-
-        for qubit in range(n):
-            if self.phi[qubit] != 0:
-                psi = apply_phase_to_qubit(psi, qubit, dim, n, phase=self.phi[qubit])
-        
-        return psi
+        return apply_phase_corrections(psi0, self.phi)
 
 
 class StandardCircuit(AlternativeCircuit):
