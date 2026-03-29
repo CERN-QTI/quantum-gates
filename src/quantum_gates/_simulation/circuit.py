@@ -505,27 +505,6 @@ class AlternativeCircuit(object):
         if self._s == self.nqubit:
             self._update_mp_list()
             
-    def _gate_call(self, fn, *args, **kwargs):
-        """
-        Call a gate constructor with a 'noisy' signature if available.
-        If the gate is noise-free (fewer params), progressively trim
-        trailing positional args until the call succeeds.
-        """
-        # try full signature first
-        try:
-            return fn(*args, **kwargs)
-        except TypeError:
-            pass
-
-        # progressively trim trailing args
-        for cut in range(len(args) - 1, -1, -1):
-            try:
-                return fn(*args[:cut], **kwargs)
-            except TypeError:
-                continue
-
-        # last resort: try with no args (some gates may be nullary)
-        return fn()
 
     def statevector(self, psi0) -> np.array:
         """Compute the output statevector of the noisy quantum circuit, psi1 = U psi0.
@@ -707,7 +686,8 @@ class AlternativeCircuit(object):
         Returns:
              None
         """
-        self.apply(gate=self._gate_call(self.gates.bitflip, tm, rout), i=i)
+        self.apply(gate=self.gates.bitflip(tm, rout, qubit_index=i), i=i)
+
 
     def relaxation(self, i: int, Dt: float, T1: float, T2: float):
         """Apply relaxation noise gate on qubit i. Add on idle-qubits.
@@ -721,7 +701,7 @@ class AlternativeCircuit(object):
         Returns:
              None
         """
-        self.apply(gate=self._gate_call(self.gates.relaxation, Dt, T1, T2), i=i)
+        self.apply(gate=self.gates.relaxation(Dt, T1, T2, qubit_index=i), i=i)
         
     def depolarizing(self, i: int, Dt: float, p: float):
         """Apply depolarizing noise gate on qubit i. Add on idle-qubits.
@@ -734,7 +714,7 @@ class AlternativeCircuit(object):
         Returns:
              None
         """
-        self.apply(gate=self._gate_call(self.gates.depolarizing, Dt, p), i=i)
+        self.apply(gate=self.gates.depolarizing(Dt, p, qubit_index=i), i=i)
 
     def X(self, i: int, p: float, T1: float, T2: float) -> np.array:
         """
@@ -750,8 +730,7 @@ class AlternativeCircuit(object):
         Returns:
               None
         """
-        #print("\n X -GATE on qubit", i, "with p =", p, ", T1 =", T1, ", T2 =", T2)
-        self.apply(gate=self._gate_call(self.gates.X, -self.phi[i], p, T1, T2), i=i)
+        self.apply(gate=self.gates.X(-self.phi[i], p, T1, T2, qubit_index=i), i=i)
 
     def SX(self, i: int, p: float, T1: float, T2: float):
         """
@@ -767,7 +746,7 @@ class AlternativeCircuit(object):
         Returns:
               None
         """
-        self.apply(gate=self._gate_call(self.gates.SX, -self.phi[i], p, T1, T2), i=i)
+        self.apply(gate=self.gates.SX(-self.phi[i], p, T1, T2, qubit_index=i), i=i)
 
     def CNOT(self, i: int, k: int, t_int: float, p_i_k: float, p_i: float, p_k: float, T1_ctr: float,
              T2_ctr: float, T1_trg: float, T2_trg: float):
@@ -794,16 +773,14 @@ class AlternativeCircuit(object):
         # Add two qubit gate to circuit snippet
         if i < k:
             # Control i
-            self._mp[i] = self._gate_call(
-                self.gates.CNOT,
-                self.phi[i], self.phi[k], t_int, p_i_k, p_i, p_k, T1_ctr, T2_ctr, T1_trg, T2_trg
+            self._mp[i] = self.gates.CNOT(
+                self.phi[i], self.phi[k], t_int, p_i_k, p_i, p_k, T1_ctr, T2_ctr, T1_trg, T2_trg, ctr_index=i, trg_index=k
             )
             self.phi[i] = self.phi[i] - np.pi/2
         else:
             # Control i
-            self._mp[i] = self._gate_call(
-                self.gates.CNOT_inv,
-                self.phi[i], self.phi[k], t_int, p_i_k, p_i, p_k, T1_ctr, T2_ctr, T1_trg, T2_trg
+            self._mp[i] = self.gates.CNOT_inv(
+                self.phi[i], self.phi[k], t_int, p_i_k, p_i, p_k, T1_ctr, T2_ctr, T1_trg, T2_trg, ctr_index=k, trg_index=i
             )
 
             self.phi[i] = self.phi[i] + np.pi/2 + np.pi
@@ -844,15 +821,13 @@ class AlternativeCircuit(object):
         # Add two qubit gate to circuit snippet
         if i < k:
             # Control i
-            self._mp[i] = self._gate_call(
-                self.gates.ECR,
-                self.phi[i], self.phi[k], t_ecr, p_i_k, p_i, p_k, T1_ctr, T2_ctr, T1_trg, T2_trg
+            self._mp[i] = self.gates.ECR(
+                self.phi[i], self.phi[k], t_ecr, p_i_k, p_i, p_k, T1_ctr, T2_ctr, T1_trg, T2_trg, ctr_index=i, trg_index=k
             )
         else:
             # Control i
-            self._mp[i] = self._gate_call(
-                self.gates.ECR_inv,
-                self.phi[k], self.phi[i], t_ecr, p_i_k, p_i, p_k, T1_ctr, T2_ctr, T1_trg, T2_trg
+            self._mp[i] = self.gates.ECR_inv(
+                self.phi[k], self.phi[i], t_ecr, p_i_k, p_i, p_k, T1_ctr, T2_ctr, T1_trg, T2_trg, ctr_index=k, trg_index=i
             )
 
         # Bookkeeping
