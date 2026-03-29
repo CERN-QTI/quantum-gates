@@ -6,6 +6,7 @@ import functools as ft
 
 from .._gates.gates import Gates
 from .backend import StandardBackend, EfficientBackend, BackendForOnes, BinaryBackend
+from .._utility.simulations_utility import apply_phase_to_qubit, apply_phase_corrections
 
 
 class Circuit(object):
@@ -651,12 +652,25 @@ class AlternativeCircuit(object):
             result = outcomes_in_q_order
 
         return psi, result
+    
+    def statevector_readout(self, psi0: np.array) -> np.array:
+        """Read out the statevector after applying per-qubit phase corrections.
 
-    
-    def statevector_readout(self, psi0) -> np.array:
-        return psi0
-    
-    
+        Args:
+            psi0: The input statevector of shape (2^n,).
+        
+        Note:
+            Phase corrections are applied internally as part of this method.
+            This is necessary because virtual Z gates accumulate phases during
+            execution that must be resolved at readout. The corrections are
+            applied on a copy of the statevector, the internal
+            computation state remains unmodified. 
+
+        Returns:
+            A new statevector with phase corrections applied to each qubit.
+        """
+        return apply_phase_corrections(psi0, self.phi)
+
     def I(self, i: int):
         """Apply identity gate on qubit i
 
@@ -1263,6 +1277,24 @@ class BinaryCircuit(object):
             
         self._backend = self._BackendClass(self.nqubit)
         self._info_gates_list = []
+
+    def statevector_readout(self, psi0: np.array) -> np.array:
+        """Read out the statevector after applying per-qubit phase corrections.
+
+        Args:
+            psi0: The input statevector of shape (2^n,).
+        
+        Note:
+            Phase corrections are applied internally as part of this method.
+            This is necessary because virtual Z gates accumulate phases during
+            execution that must be resolved at readout. The corrections are
+            applied on a copy of the statevector, the internal
+            computation state remains unmodified. 
+
+        Returns:
+            A new statevector with phase corrections applied to each qubit.
+        """
+        return apply_phase_corrections(psi0, self.phi)
 
 
 class StandardCircuit(AlternativeCircuit):

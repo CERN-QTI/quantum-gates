@@ -162,7 +162,7 @@ class MrAndersonSimulator(object):
         statevector_readout = []
 
         for shot in all_results:
-            # initialize all clbits to '0' (Aer default for unused)
+            # Initialize all clbits to '0' (Aer default for unused)
             clbit_values = ['0'] * num_clbits
 
             # Sort events by step in ascending order (chronological)
@@ -173,11 +173,13 @@ class MrAndersonSimulator(object):
                 for c, val in zip(event["clbits"], event["outcome"]):
                     clbit_values[c] = str(val)
                 
-                statevector_readout.append(event["statevector"])
-
-            # sort descending by clbit index (Aer display order)
+            # Cort descending by clbit index (Aer display order)
             bitstring = ''.join(clbit_values[::-1])
             combined_mid_strings.append(bitstring)
+
+            # cCllect barrier statevectors if any
+            statevector_readout.append(shot["barrier_statevectors"])
+
 
         # Count occurrences
         mid_counts = Counter(combined_mid_strings)
@@ -187,7 +189,7 @@ class MrAndersonSimulator(object):
             "results": all_results, # Mid-circuit measurement results
             "num_clbits": num_clbits, # Number of classical bits in circuit
             "mid_counts": dict(mid_counts), # Mid-circuit measurement counts
-            "statevector_readout": statevector_readout, # saved statevectors if any
+            "statevector_readout": statevector_readout, # Saved statevectors if any
         }
     
     
@@ -298,15 +300,15 @@ class MrAndersonSimulator(object):
                     # Instead of mutating, we store a tuple with a tag
                     data.append((
                         ("mid_measurement", {
-                            "op": op,       # keep original CircuitInstruction for debugging if you like
-                            "q_idx": q_idx, # flat qubit indices (aligned with op.qubits)
-                            "c_idx": c_idx, # flat clbit indices (aligned with op.clbits)
+                            "op": op,       # Keep original CircuitInstruction for debugging if you like
+                            "q_idx": q_idx, # Flat qubit indices (aligned with op.qubits)
+                            "c_idx": c_idx, # Flat clbit indices (aligned with op.clbits)
                         }),
                         1
                     ))
 
                 else:
-                    # final measurement → store for later
+                    # Final measurement → store for later
                     q = op.qubits[0]._index
                     c = op.clbits[0]
 
@@ -325,12 +327,24 @@ class MrAndersonSimulator(object):
                 # Use the PHYSICAL/flat index from Qiskit (._index) for consistency.
                 data.append((("reset_qubits", {"op": op, "q_idx": q_idx}), 1))
             
+            elif op_name == "barrier":
+                # Check if we have a save_statevector with this barrier label
+                if op.label is not None and 'save' in op.label: # save statevector with barrier as FANCY GATE
+                    if current_chunk:
+                        data.append((current_chunk, 0))
+                        current_chunk = []
+                        
+                    data.append((op, 1)) # keep the save_statevector operation as is
+                    
+                else: # Normal barrier, just skip
+                    continue
+
             # Not yet implemented fancy gates
             elif op_name in ("if_else", "if_test", "control_flow", "switch_case"):
                 raise NotImplementedError("if condition found in circuit, which is not implemented yet.")
 
             elif op_name in ("statevector_readout", "save_statevector", "save_state"):
-                raise NotImplementedError("saving statevector(s) operation found in circuit, which is not implemented yet.")
+                raise NotImplementedError("Use barrier with label 'save' for statevector readout")
 
             elif op_name in ("while_loop", "for_loop", "loop"):
                 raise NotImplementedError("loop operation found in circuit, which is not implemented yet.")
@@ -405,14 +419,15 @@ class MrAndersonSimulator(object):
 
             # Compute
             p = multiprocessing.Pool(n_processes)
-            for results_mid_measure, shot_result, final_outcomes in p.imap_unordered(func=_single_shot, iterable=arg_list, chunksize=chunksize):
+            for results_mid_measure, shot_result, final_outcomes, barrier_statevectors in p.imap_unordered(func=_single_shot, iterable=arg_list, chunksize=chunksize):
                 # Add shot
                 r_sum += shot_result
                 r_square_sum += np.square(shot_result)
 
                 all_results.append({
                     "mid": results_mid_measure,
-                    "final": final_outcomes
+                    "final": final_outcomes,
+                    "barrier_statevectors": barrier_statevectors
                 })
             # Shut down pool
             p.close()
@@ -421,14 +436,15 @@ class MrAndersonSimulator(object):
         else:
             for arg in arg_list:
                 # Compute
-                results_mid_measure, shot_result, final_outcomes = _single_shot(arg)
+                results_mid_measure, shot_result, final_outcomes, barrier_statevectors = _single_shot(arg)
 
                 r_sum += shot_result
                 r_square_sum += np.square(shot_result)
 
                 all_results.append({
                     "mid": results_mid_measure,
-                    "final": final_outcomes
+                    "final": final_outcomes, 
+                    "barrier_statevectors": barrier_statevectors
                 })
 
         # Calculate result
@@ -454,19 +470,19 @@ class MrAndersonSimulator(object):
 
         # Map physical qubits to local indices
         qc_v = [(phys_to_local[t[0]], t[1]) for t in q_meas_list]
-        q_meas = [x[0] for x in qc_v]  # local qubit indices
+        q_meas = [x[0] for x in qc_v]  # Local qubit indices
 
-        # create the vector with the bit strings
+        # Create the vector with the bit strings
         binary_vector = np.array([format(i, f'0{n_qubit}b') for i in np.arange(2**n_qubit)], dtype=str)
 
-        # create a list of strings with the only string measured
+        # Create a list of strings with the only string measured
         res = []
 
         for binary_str in binary_vector:
             temp = [binary_str[i] for i in q_meas]
             res.append(''.join(temp)) 
         
-        # create a dictionary to store the probabilities of measure one of the possible state
+        # Create a dictionary to store the probabilities of measure one of the possible state
         sums = {}
         for value, bit_string in zip(prob, res):
             if bit_string not in sums:
@@ -586,8 +602,8 @@ def _apply_gates_on_circuit(
                         circ.I(k)
 
             if data[j].operation.name == 'ecr':
-                q_ctr = data[j].qubits[0]._index # index control qubit
-                q_trg = data[j].qubits[1]._index # index target qubit
+                q_ctr = data[j].qubits[0]._index # Index control qubit
+                q_trg = data[j].qubits[1]._index # Index target qubit
                 for k in range(nqubit):
                     if k == q_ctr:
                         circ.ECR(k, q_trg, t_int[k][q_trg], p_int[k][q_trg], p[k], p[q_trg], T1[k], T2[k], T1[q_trg], T2[q_trg])
@@ -597,8 +613,8 @@ def _apply_gates_on_circuit(
                         circ.I(k)
 
             if data[j].operation.name == 'cx':
-                q_ctr = data[j].qubits[0]._index # index control qubit
-                q_trg = data[j].qubits[1]._index # index target qubit
+                q_ctr = data[j].qubits[0]._index # Index control qubit
+                q_trg = data[j].qubits[1]._index # Index target qubit
                 for k in range(nqubit):
                     if k == q_ctr:
                         circ.CNOT(k, q_trg, t_int[k][q_trg], p_int[k][q_trg], p[k], p[q_trg], T1[k], T2[k], T1[q_trg], T2[q_trg])
@@ -634,15 +650,15 @@ def _single_shot(args: dict) -> np.array:
     bit_flip_bool =  args["bit_flip_bool"]
     psi = psi0
     mid_results = []  # Mid results
-    saved_statevectors = []  # Store saved statevectors if needed
+    barrier_statevectors = []  # Store saved statevectors if needed
     
-    circ.reset(phase_reset=True)  # reset internal state before starting
+    circ.reset(phase_reset=True)  # Reset internal state before starting
     
     for idx, (d, flag) in enumerate(data):
         if flag == 0:      
             _apply_gates_on_circuit(d, circ, device_param, qubit_layout)
             psi = circ.statevector(psi)
-            circ.reset(phase_reset=False)  # reset internal state for next chunk
+            circ.reset(phase_reset=False)  # Reset internal state for next chunk
 
         elif flag == 1:
             
@@ -657,12 +673,12 @@ def _single_shot(args: dict) -> np.array:
                 outcome1 = [int(x) for x in np.atleast_1d(outcome)]
                 assert len(outcome1) == len(clbits), "Outcome/clbits length mismatch"
                 
-                # normalize just in case
+                # Normalize just in case
                 norm = np.linalg.norm(psi)
                 if norm > 0:
                     psi /= norm
 
-                # record debug info
+                # Record debug info
                 mid_results.append({
                     "step": idx,
                     "qubits": qubits,
@@ -699,16 +715,24 @@ def _single_shot(args: dict) -> np.array:
 
                 for k in range(circ.nqubit):
                     if k not in touched:
-                        circ.I(i=k)   # maintain full layer (no gaps)
+                        circ.I(i=k)   # Maintain full layer (no gaps)
 
                 # Apply layer to state and reset builder
                 psi = circ.statevector(psi)
                 circ.reset(phase_reset=False)  # Reset internal state for next chunk
 
+            elif d.operation.name == "barrier":
+                # Handle save_statevector with barrier label
+                if d.label is not None and 'save' in d.label:
+                    psi_copy = psi.copy()
+                    psi_copy = circ.statevector_readout(psi_copy)
+                    # Save current statevector
+                    barrier_statevectors.append((d.label, psi_copy))
+
             else:
                 op_name = d.operation.name
                 if op_name == "statevector_readout":
-                    raise NotImplementedError("statevector_readout not implemented yet")
+                    raise NotImplementedError("To save statevector, use barrier with label 'save'")
 
                 elif op_name == "if_else":
                     raise NotImplementedError("if_else not implemented yet")
@@ -716,7 +740,7 @@ def _single_shot(args: dict) -> np.array:
                 else:
                     raise ValueError(f"Unknown / not yet implemented gate: {op_name}")
     
-    # mid_measurement results in Qiskit clbit order
+    # Mid_measurement results in Qiskit clbit order
     qiskit_order_mid_results = mid_results[::-1]  
 
     # Final Measurements
@@ -742,4 +766,4 @@ def _single_shot(args: dict) -> np.array:
             local_q = phys_to_virtual[q]  # Map physical to virtual qubit
             final_outcomes[(c_reg, c_idx)] = int(bitstring[-(local_q+1)])  # Big-endian bit order
 
-    return qiskit_order_mid_results, shot_result, final_outcomes
+    return qiskit_order_mid_results, shot_result, final_outcomes, barrier_statevectors

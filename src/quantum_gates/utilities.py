@@ -13,5 +13,12 @@ from ._utility.simulations_utility import (
     transpile_qiskit_circuit,
     pretty_print_data
 )
+from ._utility.simulations_utility import (
+    sv_normal_to_qiskit,
+    sv_qiskit_to_normal, 
+    extract_qubit_orders, 
+    permute_qiskit_sv_to_logical,
+    permute_normal_sv_to_logical_normal
+    ) 
 
 from ._utility.circ_optimizer import Optimizer
