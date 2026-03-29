@@ -6,6 +6,7 @@ import functools as ft
 
 from .._gates.gates import Gates
 from .backend import StandardBackend, EfficientBackend, BackendForOnes, BinaryBackend
+from .._utility.simulations_utility import apply_phase_to_qubit
 
 
 class Circuit(object):
@@ -651,25 +652,6 @@ class AlternativeCircuit(object):
             result = outcomes_in_q_order
 
         return psi, result
-
-    def _apply_phase_to_qubit(self, psi: np.array, qubit: int, dim: int, n: int) -> np.array:
-        """Apply a phase rotation to a single qubit in the statevector.
-
-        Args:
-            psi: The statevector to modify.
-            qubit: The index of the qubit to apply the phase to.
-            dim: The dimension of the statevector (2^n).
-            n: The number of qubits.
-
-        Returns:
-            The modified statevector with the phase applied.
-        """
-        phase = self.phi[qubit]
-        for idx in range(dim):
-            bit = (idx >> (n - 1 - qubit)) & 1
-            if bit == 1:
-                psi[idx] *= np.exp(1j * phase)
-        return psi
     
     def statevector_readout(self, psi0: np.array) -> np.array:
         """Read out the statevector after applying per-qubit phase corrections.
@@ -693,11 +675,10 @@ class AlternativeCircuit(object):
 
         for qubit in range(n):
             if self.phi[qubit] != 0:
-                psi = self._apply_phase_to_qubit(psi, qubit, dim, n)
+                psi = apply_phase_to_qubit(psi, qubit, dim, n, phase=self.phi[qubit])
         
         return psi
-    
-    
+
     def I(self, i: int):
         """Apply identity gate on qubit i
 
@@ -1305,25 +1286,6 @@ class BinaryCircuit(object):
         self._backend = self._BackendClass(self.nqubit)
         self._info_gates_list = []
 
-    def _apply_phase_to_qubit(self, psi: np.array, qubit: int, dim: int, n: int) -> np.array:
-        """Apply a phase rotation to a single qubit in the statevector.
-
-        Args:
-            psi: The statevector to modify.
-            qubit: The index of the qubit to apply the phase to.
-            dim: The dimension of the statevector (2^n).
-            n: The number of qubits.
-
-        Returns:
-            The modified statevector with the phase applied.
-        """
-        phase = self.phi[qubit]
-        for idx in range(dim):
-            bit = (idx >> (n - 1 - qubit)) & 1
-            if bit == 1:
-                psi[idx] *= np.exp(1j * phase)
-        return psi
-    
     def statevector_readout(self, psi0: np.array) -> np.array:
         """Read out the statevector after applying per-qubit phase corrections.
 
@@ -1346,10 +1308,10 @@ class BinaryCircuit(object):
 
         for qubit in range(n):
             if self.phi[qubit] != 0:
-                psi = self._apply_phase_to_qubit(psi, qubit, dim, n)
+                psi = apply_phase_to_qubit(psi, qubit, dim, n, phase=self.phi[qubit])
         
         return psi
-    
+
 
 class StandardCircuit(AlternativeCircuit):
     """Class with the same interface as Circuit but built on top of the AlternativeCircuit.

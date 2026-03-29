@@ -545,3 +545,25 @@ def permute_normal_sv_to_logical_normal(
         logical_normal_sv[new_idx] = normal_order_sv[idx]
 
     return logical_normal_sv
+
+
+def apply_phase_to_qubit(psi: np.array, qubit: int, dim: int, n: int, phase: float) -> np.array:
+    """Apply a phase rotation to a single qubit in the statevector.
+
+    Args:
+        psi: The statevector to modify.
+        qubit: The index of the qubit to apply the phase to.
+        dim: The dimension of the statevector (2^n).
+        n: The number of qubits.
+        phase: The phase to be applied on the qubit
+
+    Returns:
+        The modified statevector with the phase applied.
+    """
+    if not np.issubdtype(psi.dtype, np.complexfloating):
+        raise TypeError(f"psi must be a complex array, got dtype={psi.dtype}")
+    for idx in range(dim):
+        bit = (idx >> (n - 1 - qubit)) & 1
+        if bit == 1:
+            psi[idx] *= np.exp(1j * phase)
+    return psi
