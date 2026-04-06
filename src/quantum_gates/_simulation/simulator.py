@@ -398,8 +398,7 @@ class MrAndersonSimulator(object):
                             qubit_layout: list,
                             data_measure: list,
                             bit_flip_bool: bool) -> np.array:
-        """ Performs the simulation shots many times and returns the resulting probability distribution.
-        """
+        """ Performs the simulation shots many times and returns the resulting probability distribution."""
         # Setup results
         r_sum = np.zeros(2**nqubit)
         r_square_sum = np.zeros(2**nqubit)
