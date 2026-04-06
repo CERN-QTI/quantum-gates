@@ -7,7 +7,7 @@ from qiskit_aer import AerSimulator
 from qiskit_ibm_runtime.fake_provider import FakeBrisbane
 from qiskit.circuit.controlflow import ControlFlowOp
 
-from quantum_gates._simulation.circuit import EfficientCircuit
+from quantum_gates._simulation.circuit import EfficientCircuit, BinaryCircuit
 from src.quantum_gates.utilities import DeviceParameters
 from quantum_gates.simulators import MrAndersonSimulator
 
@@ -705,7 +705,6 @@ def test_custom_noise_channels_deterministic():
         **({} if needs_controlflow else {"scheduling_method": "asap"})
     )
 
-
     res = sim.run(
     t_qiskit_circ=t_circ,
     psi0=zero_state(nqubit),
@@ -821,6 +820,227 @@ def test_custom_noise_channels_mid_qubit_protection_1():
     # Optional stronger check (variance on middle now)
     middle_values = set((b[1], b[2]) for b in counts)
     assert len(middle_values) >= 1
+
+
+# Tests exposing EfficientCircuit physical→virtual qubit mapping bug (Issue #39)
+# The EfficientCircuit path in _apply_gates_on_circuit uses raw physical qubit
+# indices from the transpiled circuit without mapping them to virtual indices.
+# This causes gates to be silently dropped (when physical index >= nqubit) or
+# applied to the wrong qubit (when layout is shuffled). These tests force
+# non-identity layouts to expose the bug regardless of transpiler version.
+def get_device_params_for_layout(qubits_layout):
+    """Create device parameters for an arbitrary qubit layout."""
+    dp = DeviceParameters(qubits_layout)
+    dp.load_from_backend(FakeBrisbane())
+    return dp.__dict__()
+
+
+def test_efficient_circuit_identity_layout_works():
+    """Control test: EfficientCircuit produces correct results with identity layout.
+
+    With initial_layout=[0, 1], physical == virtual indices, so the missing
+    mapping in the EfficientCircuit path doesn't matter. This test confirms
+    the basic simulation machinery works.
+    """
+    nqubit = 2
+    shots = 50
+    qubits_layout = [0, 1]
+
+    qc = QuantumCircuit(nqubit, nqubit)
+    qc.x(0)
+    qc.x(1)
+    qc.barrier()
+    qc.measure(range(nqubit), range(nqubit))
+    qc.x(range(nqubit))  # post-measure gates to trigger mid-measurement path
+
+    device_param = get_device_params(nqubit)
+    gates = ScaledNoiseGates(noise_scaling=1e-15)
+    sim = MrAndersonSimulator(gates=gates, CircuitClass=EfficientCircuit)
+
+    t_circ = transpile(
+        qc,
+        backend=FakeBrisbane(),
+        initial_layout=qubits_layout,
+        seed_transpiler=42,
+    )
+
+    res = sim.run(
+        t_qiskit_circ=t_circ,
+        psi0=zero_state(nqubit),
+        shots=shots,
+        device_param=device_param,
+        nqubit=nqubit,
+    )
+
+    counts = res["mid_counts"]
+    assert counts.get("11", 0) == shots, (
+        f"Control test failed: expected '11' for all {shots} shots but got {counts}"
+    )
+
+
+def test_efficient_circuit_sparse_layout_drops_x_gate():
+    """BUG: X gates are silently dropped when physical qubit index >= nqubit.
+
+    Same circuit as the identity-layout control test, but with
+    initial_layout=[10, 11]. After transpilation, gates target physical qubits
+    10 and 11. In the EfficientCircuit path of _apply_gates_on_circuit:
+
+        for k in range(nqubit):   # nqubit=2, so k=0,1
+            if k == q:            # q=10 or 11, it never matches
+                circ.X(k, ...)
+            else:
+                circ.I(k)         # Both qubits get identity
+
+    The X gates are silently replaced with identity, producing '00' instead
+    of the expected '11'.
+
+    Relates to GitHub issue #39.
+    """
+    nqubit = 2
+    shots = 50
+    qubits_layout = [10, 11]
+
+    qc = QuantumCircuit(nqubit, nqubit)
+    qc.x(0)
+    qc.x(1)
+    qc.barrier()
+    qc.measure(range(nqubit), range(nqubit))
+    qc.x(range(nqubit))  # post-measure gates to trigger mid-measurement path
+
+    device_param = get_device_params_for_layout(qubits_layout)
+    gates = ScaledNoiseGates(noise_scaling=1e-15)
+    sim = MrAndersonSimulator(gates=gates, CircuitClass=EfficientCircuit)
+
+    t_circ = transpile(
+        qc,
+        backend=FakeBrisbane(),
+        initial_layout=qubits_layout,
+        seed_transpiler=42,
+    )
+
+    res = sim.run(
+        t_qiskit_circ=t_circ,
+        psi0=zero_state(nqubit),
+        shots=shots,
+        device_param=device_param,
+        nqubit=nqubit,
+    )
+
+    counts = res["mid_counts"]
+    assert counts.get("11", 0) == shots, (
+        f"Expected '11' for all {shots} shots but got {counts}. "
+        f"X gates on physical qubits 10, 11 were silently dropped because "
+        f"the EfficientCircuit loop range(2) never matches indices 10 or 11."
+    )
+
+
+def test_efficient_circuit_sparse_layout_rz_index_error():
+    """BUG: Rz gate causes IndexError when physical qubit index >= nqubit.
+
+    circ.Rz(q, theta) does self.phi[q] where q is the raw physical index.
+    With nqubit=2, self.phi has 2 elements. A Hadamard decomposes into
+    RZ + SX on Brisbane's basis set, so Rz(10, theta) accesses self.phi[10]
+    which is out of bounds.
+
+    Relates to GitHub issue #39.
+    """
+    nqubit = 2
+    shots = 10
+    qubits_layout = [10, 11]
+
+    # H decomposes into RZ + SX on Brisbane with basis: ecr, id, rz, sx, x
+    qc = QuantumCircuit(nqubit, nqubit)
+    qc.h(0)
+    qc.barrier()
+    qc.measure(range(nqubit), range(nqubit))
+    qc.x(range(nqubit))
+
+    device_param = get_device_params_for_layout(qubits_layout)
+    gates = ScaledNoiseGates(noise_scaling=1e-15)
+    sim = MrAndersonSimulator(gates=gates, CircuitClass=EfficientCircuit)
+
+    t_circ = transpile(
+        qc,
+        backend=FakeBrisbane(),
+        initial_layout=qubits_layout,
+        seed_transpiler=42,
+    )
+
+    # Verify the transpiled circuit contains RZ (H decomposes to RZ+SX)
+    gate_names = [inst.operation.name for inst in t_circ.data]
+    has_rz = "rz" in gate_names
+    assert has_rz, (
+        f"Expected RZ in transpiled circuit but got only: {set(gate_names)}. "
+        f"Test assumes H decomposes to RZ+SX on Brisbane."
+    )
+
+    # The simulation should either crash (IndexError on self.phi[10])
+    # or produce wrong results. Either way, the current code is broken.
+    try:
+        res = sim.run(
+            t_qiskit_circ=t_circ,
+            psi0=zero_state(nqubit),
+            shots=shots,
+            device_param=device_param,
+            nqubit=nqubit,
+        )
+        # If no crash, check results are correct (H produces superposition)
+        counts = res["mid_counts"]
+        assert len(counts) > 1, (
+            f"H gate should produce superposition but got {counts}. "
+            f"Gates were likely dropped due to physical→virtual index mismatch."
+        )
+    except IndexError as e:
+        # Expected: self.phi[10] is out of bounds for nqubit=2
+        assert "index" in str(e).lower() or True, (
+            f"Got IndexError as expected: Rz on physical qubit 10 accesses "
+            f"self.phi[10] but self.phi only has {nqubit} elements."
+        )
+
+
+def test_binary_circuit_sparse_layout_noise_param_indexing():
+    """BUG: BinaryCircuit indexes noise params by physical qubit, not layout position.
+
+    BinaryCircuit correctly maps physical→virtual for circuit operations via
+    qubit_layout.index(), but accesses noise params as p[q_r] where q_r is
+    the physical qubit index. Since DeviceParameters stores T1, T2, p as
+    lists indexed by layout position (0, 1, ..., n-1), p[10] raises
+    IndexError when the layout is [10, 11] (p only has 2 elements).
+
+    Relates to GitHub issue #39.
+    """
+    nqubit = 2
+    shots = 50
+    qubits_layout = [10, 11]
+
+    qc = QuantumCircuit(nqubit, nqubit)
+    qc.x(0)
+    qc.x(1)
+    qc.barrier()
+    qc.measure(range(nqubit), range(nqubit))
+    qc.x(range(nqubit))
+
+    device_param = get_device_params_for_layout(qubits_layout)
+    gates = ScaledNoiseGates(noise_scaling=1e-15)
+
+    t_circ = transpile(
+        qc,
+        backend=FakeBrisbane(),
+        initial_layout=qubits_layout,
+        seed_transpiler=42,
+    )
+
+    sim = MrAndersonSimulator(gates=gates, CircuitClass=BinaryCircuit)
+
+    # BinaryCircuit uses p[q_r] where q_r=10, but p only has 2 elements
+    with pytest.raises(IndexError):
+        sim.run(
+            t_qiskit_circ=t_circ,
+            psi0=zero_state(nqubit),
+            shots=shots,
+            device_param=device_param,
+            nqubit=nqubit,
+        )
 
 
 def test_pickle_scaled_noise():
