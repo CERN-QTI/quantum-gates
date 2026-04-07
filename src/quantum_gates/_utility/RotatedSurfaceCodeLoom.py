@@ -19,7 +19,7 @@ from loom_rotated_surface_code.code_factory import RotatedSurfaceCode
 import stim
 
 from quantum_gates.simulators import MrAndersonSimulator
-from quantum_gates.gates import standard_gates, NoiseFreeGates
+from quantum_gates.gates import standard_gates, noise_free_gates
 from quantum_gates.circuits import EfficientCircuit
 from quantum_gates.utilities import DeviceParameters
 
@@ -78,9 +78,9 @@ class RotatedSurfaceCodeLoom:
         backend = FakeBrisbane() 
         qubits_layout = list(range(self.n_qubits))
         if self.noise:
-            set_gate = NoiseFreeGates
-        else:
             set_gate = standard_gates
+        else:
+            set_gate = noise_free_gates
         bit_flip_bool = False
         sim = MrAndersonSimulator(gates=set_gate, CircuitClass=EfficientCircuit)
 
@@ -184,9 +184,9 @@ class RotatedSurfaceCodeLoom:
         backend = FakeBrisbane() 
         
         if self.noise:
-            set_gate = NoiseFreeGates
-        else:
             set_gate = standard_gates
+        else:
+            set_gate = noise_free_gates
         bit_flip_bool = False
         sim = MrAndersonSimulator(gates=set_gate, CircuitClass=EfficientCircuit)
 
@@ -257,6 +257,8 @@ class RotatedSurfaceCodeLoom:
 
     def run_circ(self, simulator="MrAnderson"):
         if simulator == "MrAnderson":
+            self.qiskit_circuit.barrier()
+            self.qiskit_circuit.x(range(self.qiskit_circuit.num_qubits))
             qiskit_result = self.MrAnderson_run_circ()
             print("MrAnderson result:", qiskit_result)
         elif simulator == "AER":
