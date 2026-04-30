@@ -7,9 +7,9 @@ from qiskit_aer import AerSimulator
 from qiskit_ibm_runtime.fake_provider import FakeBrisbane
 from qiskit.circuit.controlflow import ControlFlowOp
 
-from quantum_gates._simulation.circuit import EfficientCircuit, BinaryCircuit
 from src.quantum_gates.utilities import DeviceParameters
-from quantum_gates.simulators import MrAndersonSimulator
+from src.quantum_gates.simulators import MrAndersonSimulator
+from src.quantum_gates.circuits import EfficientCircuit, BinaryCircuit
 
 from src.quantum_gates.gates import (
     ScaledNoiseGates,
@@ -998,14 +998,11 @@ def test_efficient_circuit_sparse_layout_rz_index_error():
         )
 
 
-def test_binary_circuit_sparse_layout_noise_param_indexing():
-    """BUG: BinaryCircuit indexes noise params by physical qubit, not layout position.
+def test_binary_circuit_sparse_layout_works():
+    """BinaryCircuit should work correctly with sparse layouts.
 
-    BinaryCircuit correctly maps physical→virtual for circuit operations via
-    qubit_layout.index(), but accesses noise params as p[q_r] where q_r is
-    the physical qubit index. Since DeviceParameters stores T1, T2, p as
-    lists indexed by layout position (0, 1, ..., n-1), p[10] raises
-    IndexError when the layout is [10, 11] (p only has 2 elements).
+    After fixing noise param indexing (p[q_v] instead of p[q_r]),
+    BinaryCircuit correctly handles sparse layouts like [10, 11].
 
     Relates to GitHub issue #39.
     """
@@ -1032,15 +1029,18 @@ def test_binary_circuit_sparse_layout_noise_param_indexing():
 
     sim = MrAndersonSimulator(gates=gates, CircuitClass=BinaryCircuit)
 
-    # BinaryCircuit uses p[q_r] where q_r=10, but p only has 2 elements
-    with pytest.raises(IndexError):
-        sim.run(
-            t_qiskit_circ=t_circ,
-            psi0=zero_state(nqubit),
-            shots=shots,
-            device_param=device_param,
-            nqubit=nqubit,
-        )
+    res = sim.run(
+        t_qiskit_circ=t_circ,
+        psi0=zero_state(nqubit),
+        shots=shots,
+        device_param=device_param,
+        nqubit=nqubit,
+    )
+
+    counts = res["mid_counts"]
+    assert counts.get("11", 0) == shots, (
+        f"Expected '11' for all {shots} shots but got {counts}"
+    )
 
 
 def test_pickle_scaled_noise():
