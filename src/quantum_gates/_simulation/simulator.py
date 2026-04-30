@@ -342,6 +342,9 @@ class MrAndersonSimulator(object):
             # Not yet implemented fancy gates
             elif op_name in ("if_else", "if_test", "control_flow", "switch_case"):
                 raise NotImplementedError("if condition found in circuit, which is not implemented yet.")
+            
+            elif op_name == 'swap':
+                raise NotImplementedError("swap operation found in circuit, which is not implemented yet.")
 
             elif op_name in ("statevector_readout", "save_statevector", "save_state"):
                 raise NotImplementedError("Use barrier with label 'save' for statevector readout")
@@ -546,32 +549,32 @@ def _apply_gates_on_circuit(
             if data[j].operation.name == 'sx':
                 q_r = data[j].qubits[0]._index # Real qubit
                 q_v = qubit_layout.index(q_r) # Virtual qubit
-                circ.SX(q_v, p[q_r], T1[q_r], T2[q_r])
-                        
+                circ.SX(q_v, p[q_v], T1[q_v], T2[q_v])
+
             if data[j].operation.name == 'x':
                 q_r = data[j].qubits[0]._index # Real qubit
                 q_v = qubit_layout.index(q_r) # Virtual qubit
-                circ.X(q_v, p[q_r], T1[q_r], T2[q_r])
-                        
+                circ.X(q_v, p[q_v], T1[q_v], T2[q_v])
+
             if data[j].operation.name == 'ecr':
                 q_ctr_r = data[j].qubits[0]._index # Index control real qubit
                 q_trg_r = data[j].qubits[1]._index # Index target real qubit
                 q_ctr_v = qubit_layout.index(q_ctr_r) # Index control virtual qubit
-                q_trg_v = qubit_layout.index(q_trg_r) # Index control virtual qubit
-                circ.ECR(q_ctr_v, q_trg_v, t_int[q_ctr_r][q_trg_r], p_int[q_ctr_r][q_trg_r], p[q_ctr_r], p[q_trg_r], T1[q_ctr_r], T2[q_ctr_r], T1[q_trg_r], T2[q_trg_r])
+                q_trg_v = qubit_layout.index(q_trg_r) # Index target virtual qubit
+                circ.ECR(q_ctr_v, q_trg_v, t_int[q_ctr_r][q_trg_r], p_int[q_ctr_r][q_trg_r], p[q_ctr_v], p[q_trg_v], T1[q_ctr_v], T2[q_ctr_v], T1[q_trg_v], T2[q_trg_v])
 
             if data[j].operation.name == 'cx':
                 q_ctr_r = data[j].qubits[0]._index # Index control real qubit
                 q_trg_r = data[j].qubits[1]._index # Index target real qubit
                 q_ctr_v = qubit_layout.index(q_ctr_r) # Index control virtual qubit
-                q_trg_v = qubit_layout.index(q_trg_r) # Index control virtual qubit
-                circ.CNOT(q_ctr_v, q_trg_v, t_int[q_ctr_r][q_trg_r], p_int[q_ctr_r][q_trg_r], p[q_ctr_r], p[q_trg_r], T1[q_ctr_r], T2[q_ctr_r], T1[q_trg_r], T2[q_trg_r])
-            
+                q_trg_v = qubit_layout.index(q_trg_r) # Index target virtual qubit
+                circ.CNOT(q_ctr_v, q_trg_v, t_int[q_ctr_r][q_trg_r], p_int[q_ctr_r][q_trg_r], p[q_ctr_v], p[q_trg_v], T1[q_ctr_v], T2[q_ctr_v], T1[q_trg_v], T2[q_trg_v])
+
             if data[j].operation.name == 'delay':
                 q_r = data[j].qubits[0]._index # Real qubit
                 q_v = qubit_layout.index(q_r) # Virtual qubit
                 time = data[j].operation.duration * dt
-                circ.relaxation(q_v, time, T1[q_r], T2[q_r])              
+                circ.relaxation(q_v, time, T1[q_v], T2[q_v])              
 
         return
 
@@ -582,53 +585,61 @@ def _apply_gates_on_circuit(
 
             if data[j].operation.name == 'rz':
                 theta = float(data[j].operation.params[0])
-                q = data[j].qubits[0]._index
-                circ.Rz(q, theta)
+                q_r = data[j].qubits[0]._index
+                q_v = qubit_layout.index(q_r)
+                circ.Rz(q_v, theta)
 
             if data[j].operation.name == 'sx':
-                q = data[j].qubits[0]._index
+                q_r = data[j].qubits[0]._index
+                q_v = qubit_layout.index(q_r)
                 for k in range(nqubit):
-                    if k == q:
-                        circ.SX(k, p[k], T1[k], T2[q])
+                    if k == q_v:
+                        circ.SX(k, p[q_v], T1[q_v], T2[q_v])
                     else:
                         circ.I(k)
 
             if data[j].operation.name == 'x':
-                q = data[j].qubits[0]._index
+                q_r = data[j].qubits[0]._index
+                q_v = qubit_layout.index(q_r)
                 for k in range(nqubit):
-                    if k == q:
-                        circ.X(k, p[k], T1[k], T2[q])
+                    if k == q_v:
+                        circ.X(k, p[q_v], T1[q_v], T2[q_v])
                     else:
                         circ.I(k)
 
             if data[j].operation.name == 'ecr':
-                q_ctr = data[j].qubits[0]._index # Index control qubit
-                q_trg = data[j].qubits[1]._index # Index target qubit
+                q_ctr_r = data[j].qubits[0]._index # index control real qubit
+                q_trg_r = data[j].qubits[1]._index # index target real qubit
+                q_ctr_v = qubit_layout.index(q_ctr_r)
+                q_trg_v = qubit_layout.index(q_trg_r)
                 for k in range(nqubit):
-                    if k == q_ctr:
-                        circ.ECR(k, q_trg, t_int[k][q_trg], p_int[k][q_trg], p[k], p[q_trg], T1[k], T2[k], T1[q_trg], T2[q_trg])
-                    elif k == q_trg:
+                    if k == q_ctr_v:
+                        circ.ECR(k, q_trg_v, t_int[q_ctr_r][q_trg_r], p_int[q_ctr_r][q_trg_r], p[q_ctr_v], p[q_trg_v], T1[q_ctr_v], T2[q_ctr_v], T1[q_trg_v], T2[q_trg_v])
+                    elif k == q_trg_v:
                         pass
                     else:
                         circ.I(k)
 
             if data[j].operation.name == 'cx':
-                q_ctr = data[j].qubits[0]._index # Index control qubit
-                q_trg = data[j].qubits[1]._index # Index target qubit
+                q_ctr_r = data[j].qubits[0]._index # index control real qubit
+                q_trg_r = data[j].qubits[1]._index # index target real qubit
+                q_ctr_v = qubit_layout.index(q_ctr_r)
+                q_trg_v = qubit_layout.index(q_trg_r)
                 for k in range(nqubit):
-                    if k == q_ctr:
-                        circ.CNOT(k, q_trg, t_int[k][q_trg], p_int[k][q_trg], p[k], p[q_trg], T1[k], T2[k], T1[q_trg], T2[q_trg])
-                    elif k == q_trg:
+                    if k == q_ctr_v:
+                        circ.CNOT(k, q_trg_v, t_int[q_ctr_r][q_trg_r], p_int[q_ctr_r][q_trg_r], p[q_ctr_v], p[q_trg_v], T1[q_ctr_v], T2[q_ctr_v], T1[q_trg_v], T2[q_trg_v])
+                    elif k == q_trg_v:
                         pass
                     else:
                         circ.I(k)
-            
+
             if data[j].operation.name == 'delay':
-                q = data[j].qubits[0]._index
+                q_r = data[j].qubits[0]._index
+                q_v = qubit_layout.index(q_r)
                 time = data[j].operation.duration * dt
                 for k in range(nqubit):
-                    if k == q:
-                        circ.relaxation(k, time, T1[k], T2[k])
+                    if k == q_v:
+                        circ.relaxation(k, time, T1[q_v], T2[q_v])
                     else:
                         circ.I(k)
 
@@ -700,18 +711,17 @@ def _single_shot(args: dict) -> np.array:
                     qubit_list=qubits_v,
                     cbit_list=None,
                 )
-
-                # Extract noise params *once*
                 T1, T2, p = device_param["T1"], device_param["T2"], device_param["p"]
 
-                # Apply X/I layer
+                # Apply X/I layer, map physical to virtual indices
                 touched = set()
                 for q, res in zip(qubits, outcomes):
-                    touched.add(q)
+                    q_v = qubit_layout.index(q)
+                    touched.add(q_v)
                     if res == 1:
-                        circ.X(i=q, p=p[q], T1=T1[q], T2=T2[q])
+                        circ.X(i=q_v, p=p[q_v], T1=T1[q_v], T2=T2[q_v])
                     else:
-                        circ.I(i=q)
+                        circ.I(i=q_v)
 
                 for k in range(circ.nqubit):
                     if k not in touched:
