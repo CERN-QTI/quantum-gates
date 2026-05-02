@@ -308,11 +308,12 @@ def pretty_print_data(data):
 def sv_normal_to_qiskit(sv: np.ndarray | Statevector) -> np.ndarray:
 
     """
-    Convert a statevector from 'normal' ordering (q0 is  - big endian notation)
+    Convert a statevector from 'normal' ordering (q0 is MSB - big endian notation)
     into Qiskit ordering (q0 is LSB - little endian notation).
 
-    Normal ordering basis: |q0 q1 ... q(n-1)>
-    Qiskit ordering basis: |q(n-1) ... q1 q0>
+    Normal ordering basis: ``|q0 q1 ... q(n-1)>``
+
+    Qiskit ordering basis: ``|q(n-1) ... q1 q0>``
 
     Parameters
     ----------
@@ -350,8 +351,9 @@ def sv_qiskit_to_normal(sv: np.ndarray | Statevector) -> np.ndarray:
     Convert a statevector from Qiskit ordering (q0 is LSB - little endian notation)
     back into 'normal' ordering (q0 is MSB - big endian notation).
 
-    Qiskit ordering basis: |q(n-1) ... q1 q0>
-    Normal ordering basis: |q0 q1 ... q(n-1)>
+    Qiskit ordering basis: ``|q(n-1) ... q1 q0>``
+
+    Normal ordering basis: ``|q0 q1 ... q(n-1)>``
 
     Parameters
     ----------
@@ -450,18 +452,13 @@ def permute_qiskit_sv_to_logical(
         Statevector in Qiskit's physical qubit order.
 
     qubit_order : list[int]
-        Mapping: logical_qubit → physical_qubit.
-        Example:
-            qubit_order = [2, 0, 1]
-            means:
-                logical q0 = physical q2
-                logical q1 = physical q0
-                logical q2 = physical q1
+        Mapping ``logical_qubit to physical_qubit``. For example,
+        ``qubit_order = [2, 0, 1]`` means logical q0 = physical q2,
+        logical q1 = physical q0, logical q2 = physical q1.
 
     Returns
     -------
     np.ndarray
-        logical_qiskit_order_sv :
         The same statevector, but expressed in logical qubit order,
         while retaining Qiskit's least-significant-bit convention.
     """
@@ -495,11 +492,9 @@ def permute_normal_sv_to_logical_normal(
     Permute a *normal-ordered* statevector (MSB-first) from physical qubit
     order back into logical qubit order, while preserving normal ordering.
 
-    Normal ordering basis:
-        |q0 q1 q2 ... q(n-1)>   with q0 = MSB
+    Normal ordering basis: ``|q0 q1 q2 ... q(n-1)>`` with q0 = MSB.
 
-    The qubit_order array maps:
-        logical_qubit -> physical_qubit
+    The ``qubit_order`` array maps ``logical_qubit to physical_qubit``.
 
     Parameters
     ----------
@@ -507,16 +502,13 @@ def permute_normal_sv_to_logical_normal(
         Statevector in physical *normal* ordering (MSB-first).
 
     qubit_order : list[int]
-        Mapping: logical_qubit → physical_qubit index.
-        Example: [2, 0, 1] means:
-            logical q0 = physical q2
-            logical q1 = physical q0
-            logical q2 = physical q1
+        Mapping ``logical_qubit to physical_qubit`` index. For example,
+        ``[2, 0, 1]`` means logical q0 = physical q2,
+        logical q1 = physical q0, logical q2 = physical q1.
 
     Returns
     -------
     np.ndarray
-        logical_normal_sv :
         Statevector reordered into logical qubit indexing,
         still using MSB-first normal ordering.
     """

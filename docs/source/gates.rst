@@ -47,6 +47,18 @@ Note that this possible issue is specific to multiprocessing on Linux
 operating system, as it depends on how new processes are created.
 
 
+Noise scaling
+-------------
+
+For finer control of the noise model, the module exposes
+``ScaledNoiseGates`` (uniform scaling), ``CustomNoiseGates`` (independently
+scalable ``p``, ``T1``, ``T2``), ``CustomNoiseChannelsGates`` (mix noisy and
+noise-free qubits) and ``SpecificNoiseGates`` (override input noise with
+fixed values). Pre-configured gate sets are available as ``standard_gates``,
+``numerical_gates``, ``almost_noise_free_gates``, ``low_pauli_noise_gates``
+and ``long_coherence_gates``.
+
+
 Instances and Classes
 ---------------------
 

@@ -2,15 +2,19 @@
 
 # -- Project information
 
-project = 'Quantum Gates'
-copyright = '2023, Di Bartolomeo, Vischi, Grossi, Da Rold, Wixinger'
-author = 'Di Bartolomeo, Vischi, Grossi, Da Rold, Wixinger'
-
-release = '1.1'
-version = '1.1.0'
-
 import os
 import sys
+from importlib.metadata import version as _pkg_version, PackageNotFoundError
+
+project = 'Quantum Gates'
+copyright = '2023-2026, Di Bartolomeo, Vischi, Cesa, Grossi, Donadi, Bassi, Da Rold, Christen, Pacey, Crognaletti, Wixinger'
+author = 'Di Bartolomeo, Vischi, Cesa, Grossi, Donadi, Bassi, Da Rold, Christen, Pacey, Crognaletti, Wixinger'
+
+try:
+    release = _pkg_version("quantum-gates")
+except PackageNotFoundError:
+    release = "0.0.0+unknown"
+version = ".".join(release.split(".")[:2])
 
 sys.path.insert(0, os.path.abspath(os.path.join('../../src')))
 
@@ -84,10 +88,11 @@ def linkcode_resolve(domain, info):
         "quantum_gates/quantum_algorithms": "quantum_gates/_utility/quantum_algorithms",
         "quantum_gates/simulators": "quantum_gates/_simulation/simulator",
         "quantum_gates/utilities": "quantum_gates/_utility/simulations_utility",
+        "quantum_gates/qiskit_provider": "quantum_gates/_qiskit_provider/ng_provider",
     }
 
     # Replace filename if the source is hidden
     if filename in source_lookup:
         filename = source_lookup[filename]
 
-    return f"https://github.com/CERN-IT-INNOVATION/quantum-gates/tree/main/src/{filename}.py"
+    return f"https://github.com/CERN-QTI/quantum-gates/tree/main/src/{filename}.py"

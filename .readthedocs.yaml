@@ -15,8 +15,10 @@ build:
 sphinx:
   configuration: docs/source/conf.py
 
-# Optionally declare the Python requirements required to build your docs
+# Install the package together with its [docs] extras (defined in setup.cfg)
 python:
   install:
-    - requirements: docs/requirements.txt
-    - path: .
+    - method: pip
+      path: .
+      extra_requirements:
+        - docs

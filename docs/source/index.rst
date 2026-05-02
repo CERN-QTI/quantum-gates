@@ -85,7 +85,10 @@ Gates
 To sample quantum gates with the noise incorporated in them, one can set
 up a :doc:`gates` instance. The methods of this object return the matrices
 as numpy array. The sampling is stochastic, and one can set the numpy seed
-to always get the same sequence of noise.
+to always get the same sequence of noise. For finer control over noise, the
+:doc:`gates <gates>` module also provides ``CustomNoiseGates``,
+``CustomNoiseChannelsGates`` and ``SpecificNoiseGates`` along with gate sets
+like ``numerical_gates`` and ``low_pauli_noise_gates``.
 
 
 Factories
@@ -126,10 +129,12 @@ to simulate 20+ qubits with the statevector method.
 Circuits
 ~~~~~~~~
 
-The simulators can be configured with a :doc:`circuits` class, such as 
+The simulators can be configured with a :doc:`circuits` class, such as
 EfficientCircuit. This class is responsible for sampling the
-noisy gates. The class can be configured with a :doc:`gates` instance and one of 
-the :doc:`backends` that executes the statevector simulation.
+noisy gates. The class can be configured with a :doc:`gates` instance and one of
+the :doc:`backends` that executes the statevector simulation. The circuit
+classes also support mid-circuit measurement (``mid_measurement``), reset
+gates (``reset``), and direct state-vector readout (``statevector_readout``).
 
 Quantum Algorithms
 ~~~~~~~~~~~~~~~~~~
@@ -156,6 +161,18 @@ In performing quantum simulation, there are many steps that are performed repeat
 setup_backend(), loading the noise information as DeviceParameters, transpiling the quantum circuits with
 create_qc_list(), and executing the simulation in parallel  with multiprocessing_parallel_simulation() on a
 powerful machine. For this reason, the most frequently used functions are part of the utilities.
+
+Metrics
+~~~~~~~
+
+The :doc:`metrics <metrics>` module provides helpers like
+``hellinger_distance`` for comparing simulated and reference distributions.
+
+Qiskit Provider
+~~~~~~~~~~~~~~~
+
+The library exposes a :doc:`Qiskit provider <qiskit_provider>` so existing
+Qiskit code can run noisy simulations without touching the call sites.
 
 
 Structure
@@ -222,6 +239,18 @@ Structure
 
    utilities
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Metrics
+
+   metrics
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Qiskit Provider
+
+   qiskit_provider
+
 
 Indices and tables
 ------------------
@@ -236,6 +265,7 @@ Citation
 You may cite this library using the following BibTex entry:
 
 .. code-block:: bibtex
+
    @article{PhysRevResearch.5.043210,
       title = {Noisy gates for simulating quantum computers},
       author = {Di Bartolomeo, Giovanni and Vischi, Michele and Cesa, Francesco and Wixinger, Roman and Grossi, Michele and Donadi, Sandro and Bassi, Angelo},
@@ -265,5 +295,7 @@ people:
 -  Sandro Donadi
 -  Angelo Bassi
 -  Paolo Da Rold (paolo.darold@studenti.units.it)
+-  Cherilyn Christen (cherilyn.christen@epfl.ch)
+-  Nathan Pacey (npacey01@gmail.com)
 -  Giulio Crognaletti (giulio.crognaletti@phd.units.it)
 -  Roman Wixinger (roman.wixinger@gmail.com)

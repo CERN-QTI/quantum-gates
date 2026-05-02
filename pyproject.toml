@@ -10,10 +10,16 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "quantum-gates"
 authors = [
-	{name = "M, Grossi", email = "michele.grossi@cern.ch"},
-	{name = "G. D. Bartolomeo", email = "dibartolomeo.giov@gmail.com"},
+	{name = "G. Di Bartolomeo", email = "dibartolomeo.giov@gmail.com"},
 	{name = "M. Vischi", email = "vischimichele@gmail.com"},
-	{name = "P. Da Rold", email = "PAOLO.DAROLD@studenti.units.it"},
+	{name = "F. Cesa"},
+	{name = "M. Grossi", email = "michele.grossi@cern.ch"},
+	{name = "S. Donadi"},
+	{name = "A. Bassi"},
+	{name = "P. Da Rold", email = "paolo.darold@studenti.units.it"},
+	{name = "C. Christen", email = "cherilyn.christen@epfl.ch"},
+	{name = "N. Pacey", email = "npacey01@gmail.com"},
+	{name = "G. Crognaletti", email = "giulio.crognaletti@phd.units.it"},
 	{name = "R. Wixinger", email = "roman.wixinger@gmail.com"}
 ]
 dynamic = ["version", "description", "readme", "requires-python", "license", "classifiers", "dependencies", "optional-dependencies"]

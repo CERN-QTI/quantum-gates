@@ -1,15 +1,11 @@
 Simulators
 ==========
 
-We refer to the `demo <../tutorials/simulation_demo.py>`__ for a usage
-sample of the simulator. The simulator has three attributes. While the
-`gates <./gates.md>`__ attribute implicitely specifies the pulse shape,
-the `CircuitClass <circuits.md>`__ knows how to perform the
-matrix-vector multiplication seen in the statevector simulation. Last,
-the parallel attribute specifies whether or not the shots should be
-executed in parallel with multiprocessing. In general, we recommend to
-parallelize the outer loop of the simulation, and not the shots, as the
-latter comes with a large overhead. 
+The simulator runs a transpiled Qiskit circuit through a chosen
+:doc:`gate set <gates>` and a chosen :doc:`circuit class <circuits>`.
+The circuit class drives the matrix-vector multiplications in the
+statevector simulation. See the ``tutorial_quantum_gates.ipynb`` and
+``simulation_demo.py`` examples in ``docs/tutorials/``.
 
 
 .. automodule:: quantum_gates.simulators
