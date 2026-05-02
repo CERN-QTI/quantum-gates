@@ -379,6 +379,63 @@ Build the wheel with the command `python3 -m build --sdist --wheel .` and naviga
 Use `ls` to display the name of the wheel, and run `pip install <filename>.whl` with the correct filename. 
 Now you can use your version of the library. 
 
+## Release process
+
+Releases are published to PyPI automatically when a GitHub Release is published.
+The workflow lives at [`.github/workflows/publish.yml`](.github/workflows/publish.yml)
+and uses [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/) via identity federation.
+
+Steps for a maintainer cutting a new release (using `2.4.0` as the example):
+
+1. Bump the version on `main` in both `setup.py` and `setup.cfg`, the values must
+   match. Open a PR titled `[release] Bump version to 2.4.0` and merge.
+
+2. Sanity-check the build locally:
+
+   ```bash
+   python -m build
+   twine check dist/*
+   ```
+
+3. Tag the release commit with the `release-X.Y.Z` format and push the tag:
+
+   ```bash
+   git tag release-2.4.0
+   git push origin release-2.4.0
+   ```
+
+4. Draft the GitHub release:
+   - Open https://github.com/CERN-QTI/quantum-gates/releases/new.
+   - Select tag `release-2.4.0`.
+   - Title: `Release quantum-gates v2.4.0`.
+   - Body: high-level bullet points grouped under `New features`,
+     `Breaking changes`, and `Other`.
+
+5. Publish the release: 
+   This triggers the publish workflow, which builds the
+   sdist + wheel in a clean runner and uploads them to PyPI.
+
+6. Verify by checking https://pypi.org/project/quantum-gates/ and installing
+   the new version in a fresh virtualenv:
+
+   ```bash
+   python -m venv /tmp/qg-smoke && source /tmp/qg-smoke/bin/activate
+   pip install quantum-gates==2.4.0
+   python -c "from quantum_gates.gates import standard_gates; print('ok')"
+   ```
+
+If the workflow fails, fix the issue and re-run it from the GitHub Actions tab.
+
+Note that this workflow was setup by the maintainers with identity federation on PyPI. For future reference, it was
+setup under [this link](https://pypi.org/manage/project/quantum-gates/settings/publishing/) by adding a publisher with:
+
+- Owner: `CERN-QTI`
+- Repository: `quantum-gates`
+- Workflow name: `publish.yml`
+- Environment: `pypi`
+
+This workflow allows us to publish new version without having to manage any secrets.
+
 ## Building the documentation
 
 The documentation for Noisy Quantum Gates is built using Sphinx and is hosted on 
