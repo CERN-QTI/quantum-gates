@@ -39,6 +39,12 @@ code:
 
 Not applying gates to each qubit will lead to errors.
 
+``BinaryCircuit`` is a variant suitable for non-linear qubit topologies
+where the qubit layout has gaps. All circuit classes also expose
+``mid_measurement`` for projective measurement on a subset of qubits,
+``reset`` for resetting a qubit, and ``statevector_readout`` for inspecting
+the simulated state at a labelled barrier.
+
 
 Classes and Instances
 ---------------------

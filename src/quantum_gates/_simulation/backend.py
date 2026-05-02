@@ -24,7 +24,7 @@ from .._utility.circ_optimizer import Optimizer
 
 
 class StandardBackend(object):
-    """Evaluates the circuits represented as tensor contractions in an trivial manner for the speed of the computations.
+    r"""Evaluates the circuits represented as tensor contractions in an trivial manner for the speed of the computations.
 
     Args:
         nqubit (int): Number of qubits.

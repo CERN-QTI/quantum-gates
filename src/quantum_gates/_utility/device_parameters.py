@@ -26,7 +26,7 @@ class DeviceParameters(object):
         p (np.array): To be added.
         rout (np.array): To be added.
         p_int (np.array): Error probabilites in the 2 qubit gate.
-        p_int (np.array): Gate time to implement controlled not operations in the 2 qubit gate.
+        t_int (np.array): Gate time to implement controlled not operations in the 2 qubit gate.
         tm (np.array): To be added.
         dt (np.array): To be added.
         
@@ -98,7 +98,7 @@ class DeviceParameters(object):
         # Verify that exists
         self._texts_exist_at_location(location)
 
-        # Load -> If the text has only one line, we have to make it into an 1x1 array explicitely.
+        # Load: If the text has only one line, we have to make it into an 1x1 array explicitely.
         if self.nr_of_qubits == 1:
             # Here we use 'array' because with only one qubit 'loadtxt' doesn't load an array
             self.T1 = np.array([np.loadtxt(location + self.f_T1)])

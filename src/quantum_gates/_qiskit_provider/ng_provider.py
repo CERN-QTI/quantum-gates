@@ -45,12 +45,11 @@ class NoisyGatesProvider:
         """Choose one of the real device to simulare the features during the running process
 
         Args:
-            name_backend (str): Name of the device from IBM, real if it's provided a token, fake if there isn't a token
-                                example: - if the device is real the name is 'ibm_sherbrooke'
-                                         - if the devise is fake the name is 'fake_sherbrooke'
+            name_backend (str): Name of the device from IBM, real if it's provided a token, fake if there
+                isn't a token. Example: ``ibm_sherbrooke`` for a real device, ``fake_sherbrooke`` for a fake one.
 
         Raises:
-            ValueError: If a token is not provided, it's not possibile to access to IBM device 
+            ValueError: If a token is not provided, it's not possibile to access to IBM device
 
         Returns:
             NoisyGatesBackend: Return a noisy gates backend that use ibm_device as real device from IBM

@@ -413,7 +413,7 @@ Steps for a maintainer cutting a new release (using `2.4.0` as the example):
 
 5. Publish the release: 
    This triggers the publish workflow, which builds the
-   sdist + wheel in a clean runner and uploads them to PyPI.
+   sdist and wheel in a clean runner and uploads them to PyPI.
 
 6. Verify by checking https://pypi.org/project/quantum-gates/ and installing
    the new version in a fresh virtualenv:
@@ -422,6 +422,7 @@ Steps for a maintainer cutting a new release (using `2.4.0` as the example):
    python -m venv /tmp/qg-smoke && source /tmp/qg-smoke/bin/activate
    pip install quantum-gates==2.4.0
    python -c "from quantum_gates.gates import standard_gates; print('ok')"
+   deactivate
    ```
 
 If the workflow fails, fix the issue and re-run it from the GitHub Actions tab.
@@ -442,30 +443,23 @@ The documentation for Noisy Quantum Gates is built using Sphinx and is hosted on
 [ReadTheDocs](https://quantum-gates.readthedocs.io/en/latest/index.html). If you wish to build and view the 
 documentation locally, follow these steps:
 
-1. Navigate to the `docs` directory:
+1. Install the package together with its documentation extras:
 
-From the root of the project, navigate to the `docs` folder:
-
-```bash
-cd docs
-```
-
-2. Install the documentation requirements:
+From the root of the project, run:
 
 ```bash
-pip install -r requirements.txt
+pip install -e ".[docs]"
 ```
 Note: It's recommended to perform this step in your virtual environment.
 
-3. Build the HTML documentation:
-
-Use the make command to build the HTML version of the documentation:
+2. Build the HTML documentation:
 
 ```bash
+cd docs
 make html
 ```
 
-4. View and check the documentation locally
+3. View and check the documentation locally
 
 Open the generated index.html file in your web browser to view the documentation:
 
@@ -509,6 +503,7 @@ This project has been developed thanks to the effort of the following people:
 * Sandro Donadi
 * Angelo Bassi 
 * Paolo Da Rold 
-* Cherilyn Christen
+* Cherilyn Christen (cherilyn.christen@epfl.ch)
 * Nathan Pacey (npacey01@gmail.com)
+* Giulio Crognaletti (giulio.crognaletti@phd.units.it)
 * Roman Wixinger (roman.wixinger@gmail.com)
