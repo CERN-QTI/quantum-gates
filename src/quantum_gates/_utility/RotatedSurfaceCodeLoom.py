@@ -260,7 +260,6 @@ class RotatedSurfaceCodeLoom:
             self.qiskit_circuit.barrier()
             self.qiskit_circuit.x(range(self.qiskit_circuit.num_qubits))
             qiskit_result = self.MrAnderson_run_circ()
-            print("MrAnderson result:", qiskit_result)
         elif simulator == "AER":
             qiskit_result = self.AER_run_circ()
             
