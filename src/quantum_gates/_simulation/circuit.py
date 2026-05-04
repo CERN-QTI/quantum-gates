@@ -581,12 +581,9 @@ class AlternativeCircuit(object):
                 self.reset(phase_reset=False)
 
             # Born probabilities (big-endian: qubit 0 = most significant)
-            p0 = 0.0
-            # compute probability of measuring 0 on target_qubit
-            for idx, amp in enumerate(psi):
-                bit = (idx >> (n - 1 - target_qubit)) & 1
-                if bit == 0:
-                    p0 += (amp.real * amp.real + amp.imag * amp.imag)
+            indices = np.arange(dim)
+            mask0 = ((indices >> (n - 1 - target_qubit)) & 1) == 0
+            p0 = float(np.sum(np.abs(psi[mask0])**2))
             p1 = 1.0 - p0
             # numerical guard 
             if p0 < 0.0: p0 = 0.0
@@ -606,9 +603,8 @@ class AlternativeCircuit(object):
 
             # Collapse on outcome onto psi
             mask_pos = n - 1 - target_qubit  # big-endian position
-            for idx in range(dim):
-                if ((idx >> mask_pos) & 1) != outcome:
-                    psi[idx] = 0.0 
+            collapse_mask = ((indices >> mask_pos) & 1) != outcome
+            psi[collapse_mask] = 0.0
 
             # Renormalize
             norm = np.linalg.norm(psi)
