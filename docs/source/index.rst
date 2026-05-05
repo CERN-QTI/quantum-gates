@@ -49,7 +49,7 @@ For users who want to contribute to the project or work with the latest source c
 
    .. code-block:: bash
 
-      git clone https://github.com/CERN-IT-INNOVATION/quantum-gates.git
+      git clone https://github.com/CERN-QTI/quantum-gates.git
 
 2. Navigate to the project directory:
 
@@ -74,7 +74,7 @@ For users who want to contribute to the project or work with the latest source c
 
 .. |github_link| raw:: html
 
-   <a href="https://github.com/CERN-IT-INNOVATION/quantum-gates" target="_blank">Github</a>
+   <a href="https://github.com/CERN-QTI/quantum-gates" target="_blank">Github</a>
 
 Functionality
 --------------
