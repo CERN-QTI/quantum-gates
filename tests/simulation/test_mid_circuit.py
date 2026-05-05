@@ -757,3 +757,217 @@ def test_array_mid_measure_entangled_correlated_parametrized(
     assert 0.30 < frac_zero < 0.70, (
         f"Expected roughly 50/50 collapse but got frac_zero={frac_zero:.2f}"
     )
+
+def _group_mid_events_by_round(mid_events, nqubits, n_mid, n_rounds):
+    """Group scalar mid-measure events back into array-measure rounds.
+
+    The simulator stores array-style qc.measure([...], [...]) as one scalar
+    event per measured qubit. We reconstruct the original array-measure rounds
+    using the classical-bit blocks assigned in the circuit.
+    """
+    grouped = []
+
+    for r in range(n_rounds):
+        c_start = nqubits + r * n_mid
+        c_end = c_start + n_mid
+
+        round_events = [
+            event for event in mid_events
+            if c_start <= event["clbits"][0] < c_end
+        ]
+
+        round_events = sorted(round_events, key=lambda e: e["clbits"][0])
+        grouped.append([int(event["outcome"][0]) for event in round_events])
+
+    return grouped
+
+
+def _deterministic_array_mid_measure_circuit(nqubits, init_ones, measure_qubits, n_rounds=1):
+    """Build deterministic circuits with array-style mid-circuit measurements.
+
+    Each round measures `measure_qubits` using one array-style qc.measure(...) call.
+    """
+    n_mid = len(measure_qubits)
+    n_clbits = nqubits + n_rounds * n_mid
+    qc = QuantumCircuit(nqubits, n_clbits)
+
+    for q in init_ones:
+        qc.x(q)
+
+    for r in range(n_rounds):
+        c_start = nqubits + r * n_mid
+        qc.measure(measure_qubits, range(c_start, c_start + n_mid))
+
+        # Keep measurements mid-circuit.
+        for q in measure_qubits:
+            qc.rz(0.001, q)
+
+        qc.barrier()
+
+    qc.measure(range(nqubits), range(nqubits))
+
+    expected_mid = [
+        [1 if q in init_ones else 0 for q in measure_qubits]
+        for _ in range(n_rounds)
+    ]
+
+    expected_final = "".join("1" if q in init_ones else "0" for q in range(nqubits))
+
+    return qc, expected_mid, expected_final
+
+
+@pytest.mark.parametrize(
+    "nqubits,init_ones,measure_qubits,n_rounds",
+    [
+        pytest.param(3, [0, 1], [0, 1], 1, id="3q_measure_2_once"),
+        pytest.param(5, [0, 2, 4], [0, 1, 2, 3, 4], 1, id="5q_measure_all_once"),
+        pytest.param(5, [1, 3], [0, 1, 2, 3, 4], 3, id="5q_measure_all_3_rounds"),
+        pytest.param(5, [0, 2, 4], [0, 2, 4], 5, id="5q_measure_subset_5_rounds"),
+    ],
+)
+def test_array_mid_measure_deterministic_parametrized(
+    nqubits,
+    init_ones,
+    measure_qubits,
+    n_rounds,
+):
+    """Array-style mid-circuit measurements should record the correct outcomes
+    for deterministic circuits and repeated measurement rounds."""
+    circ, expected_mid, expected_final = _deterministic_array_mid_measure_circuit(
+        nqubits=nqubits,
+        init_ones=init_ones,
+        measure_qubits=measure_qubits,
+        n_rounds=n_rounds,
+    )
+
+    t_circ = _transpile_midcircuit(circ, nqubits)
+
+    result = _run_sim(
+        t_circ,
+        nqubits,
+        almost_noise_free_gates,
+        BinaryCircuit,
+        shots=100,
+    )
+
+    n_mid = len(measure_qubits)
+
+    assert len(result["mid_counts"]) > 0
+    assert len(result["results"]) == 100
+
+    for shot in result["results"]:
+        assert len(shot["mid"]) == n_rounds * n_mid, (
+            f"Expected {n_rounds * n_mid} scalar mid-measure events, "
+            f"got {shot['mid']}"
+        )
+
+        grouped = _group_mid_events_by_round(
+            shot["mid"],
+            nqubits=nqubits,
+            n_mid=n_mid,
+            n_rounds=n_rounds,
+        )
+
+        assert grouped == expected_mid, (
+            f"Expected grouped mid outcomes {expected_mid}, got {grouped}"
+        )
+
+    probs = result["probs"]
+    assert probs.get(expected_final, 0.0) > 0.95, (
+        f"Expected final state |{expected_final}> but got probs={probs}"
+    )
+
+
+def _entangled_array_mid_measure_circuit(nqubits, entangle_qubits, n_rounds=1):
+    """Prepare a GHZ/Bell-like state on entangle_qubits and repeatedly
+    mid-measure them using array-style measurements."""
+    n_mid = len(entangle_qubits)
+    n_clbits = nqubits + n_rounds * n_mid
+    qc = QuantumCircuit(nqubits, n_clbits)
+
+    root = entangle_qubits[0]
+    qc.h(root)
+
+    for q in entangle_qubits[1:]:
+        qc.cx(root, q)
+
+    for r in range(n_rounds):
+        c_start = nqubits + r * n_mid
+        qc.measure(entangle_qubits, range(c_start, c_start + n_mid))
+
+        for q in entangle_qubits:
+            qc.rz(0.001, q)
+
+        qc.barrier()
+
+    qc.measure(range(nqubits), range(nqubits))
+
+    return qc
+
+
+@pytest.mark.parametrize(
+    "nqubits,entangle_qubits,n_rounds",
+    [
+        pytest.param(2, [0, 1], 1, id="bell_2q_once"),
+        pytest.param(3, [0, 1, 2], 1, id="ghz_3q_once"),
+        pytest.param(5, [0, 1, 2, 3, 4], 3, id="ghz_5q_3_rounds"),
+        pytest.param(5, [0, 2, 4], 4, id="subset_ghz_3q_4_rounds"),
+    ],
+)
+def test_array_mid_measure_entangled_correlated_parametrized(
+    nqubits,
+    entangle_qubits,
+    n_rounds,
+):
+    """Array-style mid-circuit measurements on Bell/GHZ states should remain
+    correlated across measured qubits and repeated rounds."""
+    circ = _entangled_array_mid_measure_circuit(
+        nqubits=nqubits,
+        entangle_qubits=entangle_qubits,
+        n_rounds=n_rounds,
+    )
+
+    t_circ = _transpile_midcircuit(circ, nqubits)
+
+    result = _run_sim(
+        t_circ,
+        nqubits,
+        almost_noise_free_gates,
+        BinaryCircuit,
+        shots=500,
+    )
+
+    n_mid = len(entangle_qubits)
+    first_round_values = []
+
+    for shot in result["results"]:
+        assert len(shot["mid"]) == n_rounds * n_mid, (
+            f"Expected {n_rounds * n_mid} scalar mid-measure events, "
+            f"got {shot['mid']}"
+        )
+
+        grouped = _group_mid_events_by_round(
+            shot["mid"],
+            nqubits=nqubits,
+            n_mid=n_mid,
+            n_rounds=n_rounds,
+        )
+
+        for observed in grouped:
+            assert len(observed) == n_mid
+            assert observed in ([0] * n_mid, [1] * n_mid), (
+                f"Expected correlated outcome, got {observed}"
+            )
+
+        for observed in grouped[1:]:
+            assert observed == grouped[0], (
+                f"Expected repeated measurements to match first collapse, got {grouped}"
+            )
+
+        first_round_values.append(grouped[0][0])
+
+    frac_zero = first_round_values.count(0) / len(first_round_values)
+
+    assert 0.30 < frac_zero < 0.70, (
+        f"Expected roughly 50/50 collapse but got frac_zero={frac_zero:.2f}"
+    )
