@@ -24,7 +24,7 @@ For users who want to have control over the source code, we recommend the follow
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/CERN-IT-INNOVATION/quantum-gates.git
+git clone https://github.com/CERN-QTI/quantum-gates.git
 ```
 
 2. Navigate to the project directory:
