@@ -583,3 +583,21 @@ def apply_phase_corrections(psi0: np.array, phases: list) -> np.array:
         if phases[qubit] != 0:
             psi = apply_phase_to_qubit(psi, qubit, dim, n, phase=phases[qubit])
     return psi
+
+
+def compute_born_probability(psi: np.ndarray, target_qubit: int, n: int) -> float:
+    """Compute the probability of measuring 0 on target_qubit using Born's rule."""
+    dim = psi.shape[0]
+    indices = np.arange(dim)
+    mask0 = ((indices >> (n - 1 - target_qubit)) & 1) == 0
+    return float(np.sum(np.abs(psi[mask0])**2))
+
+
+def collapse_statevector(psi: np.ndarray, target_qubit: int, outcome: int, n: int) -> np.ndarray:
+    """Collapse the statevector onto the given measurement outcome."""
+    dim = psi.shape[0]
+    indices = np.arange(dim)
+    mask_pos = n - 1 - target_qubit
+    collapse_mask = ((indices >> mask_pos) & 1) != outcome
+    psi[collapse_mask] = 0.0
+    return psi
