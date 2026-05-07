@@ -18,7 +18,9 @@ from ._utility.simulations_utility import (
     sv_qiskit_to_normal, 
     extract_qubit_orders, 
     permute_qiskit_sv_to_logical,
-    permute_normal_sv_to_logical_normal
+    permute_normal_sv_to_logical_normal,
+    compute_born_probability,
+    collapse_statevector
     ) 
 
 from ._utility.circ_optimizer import Optimizer

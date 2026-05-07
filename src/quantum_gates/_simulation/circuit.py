@@ -6,7 +6,7 @@ import functools as ft
 
 from .._gates.gates import Gates
 from .backend import StandardBackend, EfficientBackend, BackendForOnes, BinaryBackend
-from .._utility.simulations_utility import apply_phase_to_qubit, apply_phase_corrections
+from .._utility.simulations_utility import apply_phase_to_qubit, apply_phase_corrections, compute_born_probability, collapse_statevector
 
 
 class Circuit(object):
@@ -174,12 +174,7 @@ class Circuit(object):
                 self.reset(phase_reset=False)
 
             # Born probabilities (big-endian: qubit 0 = most significant)
-            p0 = 0.0
-            # Compute probability of measuring 0 on target_qubit
-            for idx, amp in enumerate(psi):
-                bit = (idx >> (n - 1 - target_qubit)) & 1
-                if bit == 0:
-                    p0 += (amp.real * amp.real + amp.imag * amp.imag)
+            p0 = compute_born_probability(psi, target_qubit, n)
             p1 = 1.0 - p0
             # Numerical guard
             if p0 < 0.0: p0 = 0.0
@@ -198,10 +193,7 @@ class Circuit(object):
             outcomes_in_q_order.append(outcome)
 
             # Collapse on outcome onto psi
-            mask_pos = n - 1 - target_qubit  # big-endian position
-            for idx in range(dim):
-                if ((idx >> mask_pos) & 1) != outcome:
-                    psi[idx] = 0.0 
+            psi = collapse_statevector(psi, target_qubit, outcome, n)
 
             # Renormalize
             norm = np.linalg.norm(psi)
@@ -581,12 +573,7 @@ class AlternativeCircuit(object):
                 self.reset(phase_reset=False)
 
             # Born probabilities (big-endian: qubit 0 = most significant)
-            p0 = 0.0
-            # compute probability of measuring 0 on target_qubit
-            for idx, amp in enumerate(psi):
-                bit = (idx >> (n - 1 - target_qubit)) & 1
-                if bit == 0:
-                    p0 += (amp.real * amp.real + amp.imag * amp.imag)
+            p0 = compute_born_probability(psi, target_qubit, n)
             p1 = 1.0 - p0
             # numerical guard 
             if p0 < 0.0: p0 = 0.0
@@ -605,10 +592,7 @@ class AlternativeCircuit(object):
             outcomes_in_q_order.append(outcome)
 
             # Collapse on outcome onto psi
-            mask_pos = n - 1 - target_qubit  # big-endian position
-            for idx in range(dim):
-                if ((idx >> mask_pos) & 1) != outcome:
-                    psi[idx] = 0.0 
+            psi = collapse_statevector(psi, target_qubit, outcome, n)
 
             # Renormalize
             norm = np.linalg.norm(psi)
@@ -1008,12 +992,7 @@ class BinaryCircuit(object):
                 self.reset(phase_reset=False)
 
             # Born probabilities (big-endian: qubit 0 = most significant)
-            p0 = 0.0
-            # compute probability of measuring 0 on target_qubit
-            for idx, amp in enumerate(psi):
-                bit = (idx >> (n - 1 - target_qubit)) & 1
-                if bit == 0:
-                    p0 += (amp.real * amp.real + amp.imag * amp.imag)
+            p0 = compute_born_probability(psi, target_qubit, n)
             p1 = 1.0 - p0
             # numerical guard 
             if p0 < 0.0: p0 = 0.0
@@ -1032,10 +1011,7 @@ class BinaryCircuit(object):
             outcomes_in_q_order.append(outcome)
 
             # Collapse on outcome onto psi
-            mask_pos = n - 1 - target_qubit  # big-endian position
-            for idx in range(dim):
-                if ((idx >> mask_pos) & 1) != outcome:
-                    psi[idx] = 0.0 
+            psi = collapse_statevector(psi, target_qubit, outcome, n)
 
             # Renormalize
             norm = np.linalg.norm(psi)

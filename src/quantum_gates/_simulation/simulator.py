@@ -61,7 +61,8 @@ class MrAndersonSimulator(object):
                 "probs": {...},               # final probability distribution
                 "results": [...],             # per-shot mid/final measurement data
                 "num_clbits": int,            # number of classical bits
-                "mid_counts": {...},          # aggregated mid-circuit results
+                "mid_counts": {...},          # Aer-style classical memory counts
+                "mid_only_counts": {...},     # mid-circuit writes before final measurements
                 "statevector_readout": [...]  # saved statevectors (if any)
             }
 
@@ -101,7 +102,8 @@ class MrAndersonSimulator(object):
                 • **"probs"** – final measurement probabilities (big-endian).
                 • **"results"** – per-shot mid/final measurement data.
                 • **"num_clbits"** – number of classical bits in the circuit.
-                • **"mid_counts"** – aggregated mid-circuit measurement bitstrings.
+                • **"mid_counts"** – aggregated Aer-style classical memory bitstrings.
+                • **"mid_only_counts"** – mid-circuit writes before final measurements.
                 • **"statevector_readout"** – measured statevectors, from mid measure.
         """
         
@@ -157,8 +159,9 @@ class MrAndersonSimulator(object):
             qubits_layout=qubits_layout_t
         )
         
-        # Build mid-circuit bitstrings with chronological processing
+        # Build count bitstrings with chronological processing.
         combined_mid_strings = []
+        combined_memory_strings = []
         statevector_readout = []
 
         for shot in all_results:
@@ -173,22 +176,34 @@ class MrAndersonSimulator(object):
                 for c, val in zip(event["clbits"], event["outcome"]):
                     clbit_values[c] = str(val)
                 
-            # Cort descending by clbit index (Aer display order)
-            bitstring = ''.join(clbit_values[::-1])
-            combined_mid_strings.append(bitstring)
+            mid_bitstring = _format_classical_bitstring(clbit_values, t_qiskit_circ)
+            combined_mid_strings.append(mid_bitstring)
 
-            # cCllect barrier statevectors if any
+            # Final measurements happen after the mid-circuit writes and should
+            # overwrite the same classical memory, matching Qiskit's get_counts().
+            memory_values = clbit_values.copy()
+            if shot["final"]:
+                for c, val in shot["final"].items():
+                    memory_values[c] = str(val)
+
+            combined_memory_strings.append(
+                _format_classical_bitstring(memory_values, t_qiskit_circ)
+            )
+
+            # Collect barrier statevectors if any
             statevector_readout.append(shot["barrier_statevectors"])
 
 
         # Count occurrences
-        mid_counts = Counter(combined_mid_strings)
+        mid_counts = Counter(combined_memory_strings)
+        mid_only_counts = Counter(combined_mid_strings)
 
         return {
             "probs": counts_ng,
             "results": all_results, # Mid-circuit measurement results
             "num_clbits": num_clbits, # Number of classical bits in circuit
-            "mid_counts": dict(mid_counts), # Mid-circuit measurement counts
+            "mid_counts": dict(mid_counts), # Aer-style classical memory counts
+            "mid_only_counts": dict(mid_only_counts), # Mid-circuit writes before final measurements
             "statevector_readout": statevector_readout, # Saved statevectors if any
         }
     
@@ -264,14 +279,7 @@ class MrAndersonSimulator(object):
 
         raw_data = t_qiskit_circ.data
     
-        # Build lookup: Clbit → register name
         used_set = set(used_logicals)
-
-        # Optional: clbit -> (register_name, local_idx) (keep if you need it later) 
-        clbit_to_reg = {}
-        for reg in t_qiskit_circ.cregs:
-            for local_i, bit in enumerate(reg):
-                clbit_to_reg[bit] = (reg.name, local_i)
 
         # Loop through the raw data, circuit representation from Qiskit
         # Each op is a CircuitInstruction, each i is the compilation step
@@ -311,10 +319,8 @@ class MrAndersonSimulator(object):
                     # Final measurement → store for later
                     q = op.qubits[0]._index
                     c = op.clbits[0]
-
-                    c_reg = clbit_to_reg.get(op.clbits[0], "unknown")
-                    c_idx = op.clbits[0]._index
-                    data_measure.append((q, (c_reg, c_idx)))
+                    c_flat = t_qiskit_circ.find_bit(c).index
+                    data_measure.append((q, c_flat))
 
             # RESET
             elif op_name == "reset":
@@ -772,8 +778,24 @@ def _single_shot(args: dict) -> np.array:
         phys_to_virtual = {q: i for i, q in enumerate(qubit_layout)}  
 
         final_outcomes = {}
-        for q, (c_reg, c_idx) in data_measure:
+        for q, c_idx in data_measure:
             local_q = phys_to_virtual[q]  # Map physical to virtual qubit
-            final_outcomes[(c_reg, c_idx)] = int(bitstring[-(local_q+1)])  # Big-endian bit order
+            final_outcomes[c_idx] = int(bitstring[local_q])  # Normal/MSB qubit order
 
     return qiskit_order_mid_results, shot_result, final_outcomes, barrier_statevectors
+
+
+def _format_classical_bitstring(clbit_values: list[str], circ: QuantumCircuit) -> str:
+    """Format flat classical memory the same way Qiskit displays counts."""
+    if len(circ.cregs) <= 1:
+        return ''.join(clbit_values[::-1])
+
+    covered = sum(len(reg) for reg in circ.cregs)
+    if covered != len(clbit_values):
+        return ''.join(clbit_values[::-1])
+
+    parts = []
+    for reg in reversed(circ.cregs):
+        indices = [circ.find_bit(bit).index for bit in reg]
+        parts.append(''.join(clbit_values[i] for i in reversed(indices)))
+    return ' '.join(parts)

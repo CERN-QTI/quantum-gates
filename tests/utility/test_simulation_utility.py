@@ -3,7 +3,7 @@ import os
 import pytest
 
 from src.quantum_gates.utilities import post_process_split
-from src.quantum_gates._utility.simulations_utility import apply_phase_to_qubit, apply_phase_corrections
+from src.quantum_gates._utility.simulations_utility import apply_phase_to_qubit, apply_phase_corrections, compute_born_probability, collapse_statevector
 
 
 location = 'tests/helpers/result_samples'
@@ -210,3 +210,88 @@ def test_post_process_split_mean():
         f"Expected {mean_expected} but found {mean_array}."
     for f in target_filenames:
         os.remove(f)
+
+
+def test_born_prob_zero_state():
+    # |0> state: probability of measuring 0 should be 1.0
+    psi = np.array([1.0, 0.0], dtype=complex)
+    assert np.isclose(compute_born_probability(psi, target_qubit=0, n=1), 1.0)
+
+def test_born_prob_one_state():
+    # |1> state: probability of measuring 0 should be 0.0
+    psi = np.array([0.0, 1.0], dtype=complex)
+    assert np.isclose(compute_born_probability(psi, target_qubit=0, n=1), 0.0)
+
+
+def test_born_probability_superposition():
+    # |+> state: p0 should be 0.5
+    psi = np.array([1, 1], dtype=complex) / np.sqrt(2)
+    assert np.isclose(compute_born_probability(psi, 0, 1), 0.5)
+
+def test_born_prob_sums_to_one():
+    # p0 + p1 should always equal 1 for a normalised statevector
+    rng = np.random.default_rng(0)
+    psi = rng.random(2**3) + 1j * rng.random(2**3)
+    psi /= np.linalg.norm(psi)
+    p0 = compute_born_probability(psi, target_qubit=1, n=3)
+    assert np.isclose(p0 + (1.0 - p0), 1.0)
+
+def test_old_vs_new_born_probability():
+    # compare old loop implementation against new vectorised one
+    psi = np.random.rand(2**4) + 1j * np.random.rand(2**4)
+    psi /= np.linalg.norm(psi)
+    n = 4
+    target = 2
+
+    # old
+    p0_old = 0.0
+    for idx, amp in enumerate(psi):
+        if ((idx >> (n - 1 - target)) & 1) == 0:
+            p0_old += amp.real**2 + amp.imag**2
+
+    # new
+    p0_new = compute_born_probability(psi, target, n)
+    assert np.isclose(p0_old, p0_new)
+
+def test_collapse_zeros_out_correct_amplitudes():
+    # |+> collapsed to 0: |1> amplitude should be zeroed
+    psi = np.array([1.0, 1.0], dtype=complex) / np.sqrt(2)
+    result = collapse_statevector(psi.copy(), target_qubit=0, outcome=0, n=1)
+    assert result[1] == 0.0
+    assert result[0] != 0.0
+
+def test_collapse_to_one_zeros_correct_amplitudes():
+    # |+> collapsed to 1: |0> amplitude should be zeroed
+    psi = np.array([1.0, 1.0], dtype=complex) / np.sqrt(2)
+    result = collapse_statevector(psi.copy(), target_qubit=0, outcome=1, n=1)
+    assert result[0] == 0.0
+    assert result[1] != 0.0
+
+def test_collapse_matches_old_loop():
+    # regression test: new vectorised collapse matches old Python loop
+    rng = np.random.default_rng(7)
+    psi = rng.random(2**4) + 1j * rng.random(2**4)
+    psi /= np.linalg.norm(psi)
+    n, target, outcome = 4, 2, 0
+
+    psi_old = psi.copy()
+    mask_pos = n - 1 - target
+    for idx in range(len(psi_old)):
+        if ((idx >> mask_pos) & 1) != outcome:
+            psi_old[idx] = 0.0
+
+    psi_new = collapse_statevector(psi.copy(), target, outcome, n)
+    np.testing.assert_array_almost_equal(psi_new, psi_old)
+
+def test_collapse_preserves_correct_amplitudes():
+    # amplitudes consistent with outcome should be untouched
+    rng = np.random.default_rng(3)
+    psi = rng.random(2**3) + 1j * rng.random(2**3)
+    psi /= np.linalg.norm(psi)
+    psi_original = psi.copy()
+
+    result = collapse_statevector(psi.copy(), target_qubit=1, outcome=0, n=3)
+    n, target = 3, 1
+    for idx in range(len(result)):
+        if ((idx >> (n - 1 - target)) & 1) == 0:
+            assert result[idx] == psi_original[idx]
