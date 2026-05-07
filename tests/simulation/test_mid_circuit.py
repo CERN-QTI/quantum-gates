@@ -1,7 +1,8 @@
 import pytest
 import numpy as np
 
-from qiskit import QuantumCircuit, transpile
+from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, transpile
+from qiskit_aer import AerSimulator
 from qiskit_ibm_runtime.fake_provider import FakeBrisbane
 
 from src.quantum_gates.simulators import MrAndersonSimulator
@@ -473,6 +474,75 @@ def test_mid_circuit_output_clbit_width():
             f"(len={len(key)}). The extra character comes from the additional "
             f"classical bit used for mid-circuit measurement, not an extra qubit."
         )
+
+
+def test_final_measurements_are_included_in_qiskit_ordered_counts():
+    """Final measurement writes should appear in the Aer-style count strings."""
+    # Arrange
+    nqubits = 2
+    shots = 20
+    circ = QuantumCircuit(nqubits, nqubits)
+    circ.x(0)
+    circ.measure([0, 1], [0, 1])
+
+    t_circ = _transpile_standard(circ, nqubits)
+    aer_counts = AerSimulator().run(t_circ, shots=shots).result().get_counts()
+
+    # Act
+    result = _run_sim(t_circ, nqubits, almost_noise_free_gates, BinaryCircuit, shots=shots)
+
+    # Assert
+    assert result["mid_counts"] == aer_counts
+
+
+def test_mid_and_final_measurements_share_classical_memory_like_aer():
+    """Mid-circuit writes and final writes should be folded into one count key."""
+    # Arrange
+    nqubits = 3
+    shots = 20
+    circ = QuantumCircuit(nqubits, 5)
+    circ.x(0)
+    circ.x(2)
+    circ.measure([0, 2], [3, 4])
+    circ.rz(0.001, 0)
+    circ.rz(0.001, 2)
+    circ.barrier()
+    circ.measure(range(nqubits), range(nqubits))
+
+    t_circ = _transpile_midcircuit(circ, nqubits)
+    aer_counts = AerSimulator().run(t_circ, shots=shots).result().get_counts()
+
+    # Act
+    result = _run_sim(t_circ, nqubits, almost_noise_free_gates, BinaryCircuit, shots=shots)
+
+    # Assert
+    assert result["mid_counts"] == aer_counts
+    assert result["mid_only_counts"] == {"11000": shots}
+
+
+def test_counts_match_aer_multi_register_formatting():
+    """Multiple classical registers should be grouped like Qiskit get_counts()."""
+    # Arrange
+    nqubits = 3
+    shots = 20
+    q = QuantumRegister(nqubits, "q")
+    a = ClassicalRegister(2, "a")
+    b = ClassicalRegister(2, "b")
+    circ = QuantumCircuit(q, a, b)
+    circ.x(q[0])
+    circ.x(q[2])
+    circ.measure(q[0], a[0])
+    circ.measure(q[1], a[1])
+    circ.measure(q[2], b[1])
+
+    t_circ = _transpile_standard(circ, nqubits)
+    aer_counts = AerSimulator().run(t_circ, shots=shots).result().get_counts()
+
+    # Act
+    result = _run_sim(t_circ, nqubits, almost_noise_free_gates, BinaryCircuit, shots=shots)
+
+    # Assert
+    assert result["mid_counts"] == aer_counts
 
 def _group_mid_events_by_round(mid_events, nqubits, n_mid, n_rounds):
     """Group scalar mid-measure events back into array-measure rounds.

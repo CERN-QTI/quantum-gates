@@ -1,6 +1,7 @@
 import pytest
 import numpy as np
 import time
+import random
 
 from src.quantum_gates.backends import EfficientBackend, BinaryBackend
 from src.quantum_gates._simulation.backend import StandardBackend, BackendForOnes
@@ -22,6 +23,27 @@ efficient_backend = [EfficientBackend, BackendForOnes]
 
 
 """ Tests """
+
+
+def test_generate_random_matrix_products_uses_declared_gate_set():
+    """Guard against NumPy array addition when constructing the helper gate list."""
+    random.seed(123)
+    mp_list, mp_list_b = generate_random_matrix_products(
+        nqubits=5,
+        steps=3,
+        prob_cnot=0.0,
+    )
+
+    generated_single_gates = [gate for mp in mp_list for gate in mp]
+    expected_single_gates = list(single_qubit_gate_list)
+
+    for gate in generated_single_gates:
+        assert any(np.array_equal(gate, expected) for expected in expected_single_gates)
+        assert np.max(np.abs(gate)) <= 1.0
+
+    for gate, qubits in mp_list_b:
+        assert qubits[1] == -1
+        assert any(np.array_equal(gate, expected) for expected in expected_single_gates)
 
 
 @pytest.mark.parametrize("nqubit,backend", [(nqubit, Backend) for nqubit in [2, 4, 6] for Backend in backends])
@@ -138,6 +160,7 @@ def test_backends_get_same_result_with_single_qubit_gates(nqubits: int, steps: i
 
 @pytest.mark.parametrize("nqubits, steps", [(n, s) for n in [2, 3, 4, 6, 8, 9, 10] for s in [5]])
 def test_backends_get_same_result_with_random_matrix_products(nqubits, steps):
+    random.seed(1000 + 10 * nqubits + steps)
     mp_list, mp_list_b = generate_random_matrix_products(nqubits, steps=steps)
 
     # Backends

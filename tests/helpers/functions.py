@@ -4,7 +4,7 @@ Helper functions for the unit tests.
 
 import random
 
-from tests.helpers.gates import X, SX,Z, H, CNOT, identity, single_qubit_gate_list
+from tests.helpers.gates import X, SX, Z, H, CNOT, identity, single_qubit_gate_list
 
 
 def generate_random_matrix_products(nqubits: int, steps: int, prob_cnot: float=0.5, many_identites=False):
@@ -14,7 +14,10 @@ def generate_random_matrix_products(nqubits: int, steps: int, prob_cnot: float=0
         Generate list both for first class of backends (Efficient, Standard, Ones) and also for second class (Binary) that use different type of mp_list
     """
 
-    gate_list = [X, SX, Z, H] + [identity for i in range(40)] if many_identites else single_qubit_gate_list + identity
+    if many_identites:
+        gate_list = [X, SX, Z, H] + [identity for _ in range(40)]
+    else:
+        gate_list = list(single_qubit_gate_list) + [identity]
 
     # Result
     mp_list = []
