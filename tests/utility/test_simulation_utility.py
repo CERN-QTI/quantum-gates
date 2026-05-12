@@ -218,6 +218,7 @@ def test_born_prob_zero_state():
     psi = np.array([1.0, 0.0], dtype=complex)
     assert np.isclose(compute_born_probability(psi, target_qubit=0, n=1), 1.0)
 
+
 def test_born_prob_one_state():
     # |1> state: probability of measuring 0 should be 0.0
     psi = np.array([0.0, 1.0], dtype=complex)
@@ -229,6 +230,7 @@ def test_born_probability_superposition():
     psi = np.array([1, 1], dtype=complex) / np.sqrt(2)
     assert np.isclose(compute_born_probability(psi, 0, 1), 0.5)
 
+
 def test_born_prob_sums_to_one():
     # p0 + p1 should always equal 1 for a normalised statevector
     rng = np.random.default_rng(0)
@@ -236,6 +238,7 @@ def test_born_prob_sums_to_one():
     psi /= np.linalg.norm(psi)
     p0 = compute_born_probability(psi, target_qubit=1, n=3)
     assert np.isclose(p0 + (1.0 - p0), 1.0)
+
 
 def test_old_vs_new_born_probability():
     # compare old loop implementation against new vectorised one
@@ -254,6 +257,7 @@ def test_old_vs_new_born_probability():
     p0_new = compute_born_probability(psi, target, n)
     assert np.isclose(p0_old, p0_new)
 
+
 def test_collapse_zeros_out_correct_amplitudes():
     # |+> collapsed to 0: |1> amplitude should be zeroed
     psi = np.array([1.0, 1.0], dtype=complex) / np.sqrt(2)
@@ -261,12 +265,14 @@ def test_collapse_zeros_out_correct_amplitudes():
     assert result[1] == 0.0
     assert result[0] != 0.0
 
+
 def test_collapse_to_one_zeros_correct_amplitudes():
     # |+> collapsed to 1: |0> amplitude should be zeroed
     psi = np.array([1.0, 1.0], dtype=complex) / np.sqrt(2)
     result = collapse_statevector(psi.copy(), target_qubit=0, outcome=1, n=1)
     assert result[0] == 0.0
     assert result[1] != 0.0
+
 
 def test_collapse_matches_old_loop():
     # regression test: new vectorised collapse matches old Python loop
@@ -284,6 +290,7 @@ def test_collapse_matches_old_loop():
     psi_new = collapse_statevector(psi.copy(), target, outcome, n)
     np.testing.assert_array_almost_equal(psi_new, psi_old)
 
+
 def test_collapse_preserves_correct_amplitudes():
     # amplitudes consistent with outcome should be untouched
     rng = np.random.default_rng(3)
@@ -296,3 +303,134 @@ def test_collapse_preserves_correct_amplitudes():
     for idx in range(len(result)):
         if ((idx >> (n - 1 - target)) & 1) == 0:
             assert result[idx] == psi_original[idx]
+
+
+def computational_basis_state(index: int, n: int) -> np.ndarray:
+    psi = np.zeros(2**n, dtype=complex)
+    psi[index] = 1.0
+    return psi
+
+
+def test_permute_brings_qubits_to_front():
+    # After permutation, q_ctr_v and q_trg_v should be at positions 0 and 1
+    n = 4
+    rng = np.random.default_rng(42)
+    psi = rng.random(2**n) + 1j * rng.random(2**n)
+    psi /= np.linalg.norm(psi)
+
+    psi_permuted, perm = permute_to_adjacent(psi, q_ctr_v=0, q_trg_v=3, n=n)
+
+    assert perm[0] == 0
+    assert perm[1] == 3
+
+
+def test_permute_consecutive_qubits_unchanged():
+    # If qubits are already at 0 and 1, permutation should be identity
+    n = 4
+    rng = np.random.default_rng(0)
+    psi = rng.random(2**n) + 1j * rng.random(2**n)
+    psi /= np.linalg.norm(psi)
+
+    psi_permuted, perm = permute_to_adjacent(psi, q_ctr_v=0, q_trg_v=1, n=n)
+    np.testing.assert_array_almost_equal(psi_permuted, psi)
+
+
+def test_permute_preserves_norm():
+    n = 5
+    rng = np.random.default_rng(7)
+    psi = rng.random(2**n) + 1j * rng.random(2**n)
+    psi /= np.linalg.norm(psi)
+
+    psi_permuted, perm = permute_to_adjacent(psi, q_ctr_v=1, q_trg_v=4, n=n)
+    assert np.isclose(np.linalg.norm(psi_permuted), 1.0)
+
+
+def test_permute_preserves_all_amplitudes():
+    # Permutation should not change the set of amplitudes, just reorder them
+    n = 4
+    rng = np.random.default_rng(3)
+    psi = rng.random(2**n) + 1j * rng.random(2**n)
+    psi /= np.linalg.norm(psi)
+
+    psi_permuted, perm = permute_to_adjacent(psi, q_ctr_v=0, q_trg_v=3, n=n)
+
+    np.testing.assert_array_almost_equal(
+        np.sort(np.abs(psi_permuted)),
+        np.sort(np.abs(psi))
+    )
+
+
+def test_permute_perm_is_valid_permutation():
+    # perm should be a valid permutation of range(n)
+    n = 5
+    rng = np.random.default_rng(1)
+    psi = rng.random(2**n) + 1j * rng.random(2**n)
+    psi /= np.linalg.norm(psi)
+
+    _, perm = permute_to_adjacent(psi, q_ctr_v=2, q_trg_v=4, n=n)
+    assert sorted(perm) == list(range(n))
+
+
+def test_permute_back_inverts_permute_to_adjacent():
+    # Round trip should recover original psi exactly
+    n = 4
+    rng = np.random.default_rng(42)
+    psi = rng.random(2**n) + 1j * rng.random(2**n)
+    psi /= np.linalg.norm(psi)
+
+    psi_permuted, perm = permute_to_adjacent(psi, q_ctr_v=0, q_trg_v=3, n=n)
+    psi_recovered = permute_back(psi_permuted, perm, n)
+
+    np.testing.assert_array_almost_equal(psi_recovered, psi)
+
+
+def test_permute_back_inverts_for_various_qubit_pairs():
+    n = 5
+    pairs = [(0, 2), (1, 4), (0, 4), (2, 3), (1, 3)]
+    rng = np.random.default_rng(99)
+    psi = rng.random(2**n) + 1j * rng.random(2**n)
+    psi /= np.linalg.norm(psi)
+
+    for q_ctr_v, q_trg_v in pairs:
+        psi_permuted, perm = permute_to_adjacent(psi, q_ctr_v, q_trg_v, n)
+        psi_recovered = permute_back(psi_permuted, perm, n)
+        np.testing.assert_array_almost_equal(psi_recovered, psi,
+            err_msg=f"Round trip failed for qubits ({q_ctr_v}, {q_trg_v})")
+
+
+def test_permute_back_preserves_norm():
+    n = 4
+    rng = np.random.default_rng(5)
+    psi = rng.random(2**n) + 1j * rng.random(2**n)
+    psi /= np.linalg.norm(psi)
+
+    psi_permuted, perm = permute_to_adjacent(psi, q_ctr_v=1, q_trg_v=3, n=n)
+    psi_recovered = permute_back(psi_permuted, perm, n)
+
+    assert np.isclose(np.linalg.norm(psi_recovered), 1.0)
+
+
+def test_permute_back_consecutive_qubits_unchanged():
+    # If already consecutive, round trip should be identity
+    n = 4
+    rng = np.random.default_rng(11)
+    psi = rng.random(2**n) + 1j * rng.random(2**n)
+    psi /= np.linalg.norm(psi)
+
+    psi_permuted, perm = permute_to_adjacent(psi, q_ctr_v=0, q_trg_v=1, n=n)
+    psi_recovered = permute_back(psi_permuted, perm, n)
+
+    np.testing.assert_array_almost_equal(psi_recovered, psi)
+
+
+def test_permute_back_large_statevector():
+    # Sanity check at 2^17
+    n = 17
+    rng = np.random.default_rng(0)
+    psi = rng.random(2**n) + 1j * rng.random(2**n)
+    psi /= np.linalg.norm(psi)
+
+    psi_permuted, perm = permute_to_adjacent(psi, q_ctr_v=0, q_trg_v=16, n=n)
+    psi_recovered = permute_back(psi_permuted, perm, n)
+
+    np.testing.assert_array_almost_equal(psi_recovered, psi)
