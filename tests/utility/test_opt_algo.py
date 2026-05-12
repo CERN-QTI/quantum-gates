@@ -12,9 +12,10 @@ from src.quantum_gates.circuits import BinaryCircuit
 from src.quantum_gates.gates import standard_gates
 from src.quantum_gates.backends import BinaryBackend
 from src.quantum_gates._simulation.simulator import _apply_gates_on_circuit
+from tests.helpers.paths import device_parameters_path
 
 
-location = "tests/helpers/device_parameters/ibm_kyoto/"
+location = device_parameters_path("ibm_kyoto")
 
 backend = setup_backend(device_name=FakeBrisbane(), use_fake=True)
 

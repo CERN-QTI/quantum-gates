@@ -2,9 +2,10 @@ import pytest
 import numpy as np
 
 from src.quantum_gates.utilities import DeviceParameters
+from tests.helpers.paths import device_parameters_path
 
 
-location = 'tests/helpers/device_parameters/ibm_kyiv/'
+location = device_parameters_path("ibm_kyiv")
 invalid_location = 'invalid_location'
 qubits_layout = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 

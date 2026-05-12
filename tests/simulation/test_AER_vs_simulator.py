@@ -36,7 +36,9 @@ def _run_mr_anderson(t_circ, nqubits, circuit_class, shots=500):
         device_param=_device_param(nqubits),
         nqubit=nqubits,
     )
-    return result["probs"]
+    counts = result["mid_counts"]
+    total = sum(counts.values())
+    return {k: v/total for k, v in counts.items()}
 
 def _run_aer(circ, shots=2000):
     sim = AerSimulator()

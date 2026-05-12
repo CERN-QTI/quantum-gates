@@ -13,9 +13,10 @@ from src.quantum_gates.utilities import DeviceParameters
 from src.quantum_gates.utilities import (
     sv_normal_to_qiskit,
 ) 
+from tests.helpers.paths import device_parameters_path
 
 _backend = FakeBrisbane()
-_location = "tests/helpers/device_parameters/ibm_kyoto/"
+_location = device_parameters_path("ibm_kyoto")
 _LAYOUT = [0, 1, 2, 3, 4]
 
 ABS_TOL = 1e-6
