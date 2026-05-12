@@ -811,7 +811,7 @@ def _deterministic_array_mid_measure_circuit(nqubits, init_ones, measure_qubits,
         for _ in range(n_rounds)
     ]
 
-    expected_final = "".join("1" if q in init_ones else "0" for q in range(nqubits))
+    expected_final = "".join("1" if q in init_ones else "0" for q in reversed(range(nqubits)))
 
     return qc, expected_mid, expected_final
 
