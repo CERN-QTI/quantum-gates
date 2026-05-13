@@ -620,6 +620,7 @@ def test_array_mid_measure_deterministic_parametrized(
 ):
     """Array-style mid-circuit measurements should record the correct outcomes
     for deterministic circuits and repeated measurement rounds."""
+    # Arrange
     circ, expected_mid, expected_final = _deterministic_array_mid_measure_circuit(
         nqubits=nqubits,
         init_ones=init_ones,
@@ -629,6 +630,7 @@ def test_array_mid_measure_deterministic_parametrized(
 
     t_circ = _transpile_midcircuit(circ, nqubits)
 
+    # Act
     result = _run_sim(
         t_circ,
         nqubits,
@@ -639,6 +641,7 @@ def test_array_mid_measure_deterministic_parametrized(
 
     n_mid = len(measure_qubits)
 
+    # Assert
     assert len(result["mid_counts"]) > 0
     assert len(result["results"]) == 100
 
@@ -708,6 +711,7 @@ def test_array_mid_measure_entangled_correlated_parametrized(
 ):
     """Array-style mid-circuit measurements on Bell/GHZ states should remain
     correlated across measured qubits and repeated rounds."""
+    # Arrange
     circ = _entangled_array_mid_measure_circuit(
         nqubits=nqubits,
         entangle_qubits=entangle_qubits,
@@ -716,6 +720,7 @@ def test_array_mid_measure_entangled_correlated_parametrized(
 
     t_circ = _transpile_midcircuit(circ, nqubits)
 
+    # Act
     result = _run_sim(
         t_circ,
         nqubits,
@@ -727,6 +732,7 @@ def test_array_mid_measure_entangled_correlated_parametrized(
     n_mid = len(entangle_qubits)
     first_round_values = []
 
+    # Assert
     for shot in result["results"]:
         assert len(shot["mid"]) == n_rounds * n_mid, (
             f"Expected {n_rounds * n_mid} scalar mid-measure events, "
@@ -767,7 +773,6 @@ def _group_mid_events_by_round(mid_events, nqubits, n_mid, n_rounds):
     using the classical-bit blocks assigned in the circuit.
     """
     grouped = []
-
     for r in range(n_rounds):
         c_start = nqubits + r * n_mid
         c_end = c_start + n_mid
@@ -800,6 +805,7 @@ def test_array_mid_measure_deterministic_parametrized(
 ):
     """Array-style mid-circuit measurements should record the correct outcomes
     for deterministic circuits and repeated measurement rounds."""
+    # Arrange
     circ, expected_mid, expected_final = _deterministic_array_mid_measure_circuit(
         nqubits=nqubits,
         init_ones=init_ones,
@@ -809,6 +815,7 @@ def test_array_mid_measure_deterministic_parametrized(
 
     t_circ = _transpile_midcircuit(circ, nqubits)
 
+    # Act
     result = _run_sim(
         t_circ,
         nqubits,
@@ -819,6 +826,7 @@ def test_array_mid_measure_deterministic_parametrized(
 
     n_mid = len(measure_qubits)
 
+    # Assert
     assert len(result["mid_counts"]) > 0
     assert len(result["results"]) == 100
 
@@ -888,6 +896,7 @@ def test_array_mid_measure_entangled_correlated_parametrized(
 ):
     """Array-style mid-circuit measurements on Bell/GHZ states should remain
     correlated across measured qubits and repeated rounds."""
+    # Arrange
     circ = _entangled_array_mid_measure_circuit(
         nqubits=nqubits,
         entangle_qubits=entangle_qubits,
@@ -896,6 +905,7 @@ def test_array_mid_measure_entangled_correlated_parametrized(
 
     t_circ = _transpile_midcircuit(circ, nqubits)
 
+    # Act
     result = _run_sim(
         t_circ,
         nqubits,
@@ -907,6 +917,7 @@ def test_array_mid_measure_entangled_correlated_parametrized(
     n_mid = len(entangle_qubits)
     first_round_values = []
 
+    # Assert
     for shot in result["results"]:
         assert len(shot["mid"]) == n_rounds * n_mid, (
             f"Expected {n_rounds * n_mid} scalar mid-measure events, "

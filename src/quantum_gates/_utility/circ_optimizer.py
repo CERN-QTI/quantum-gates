@@ -319,7 +319,8 @@ class Optimizer(object):
                             result_4.append([last_part[ind][0],[q_i]])
 
                         # else: do nothing if indices == []
-                        
+                        else:
+                            pass
                         last_part = [element for i, element in enumerate(last_part) if i not in indices] # remove from the last part the used items in this iteration
                     
                     elif len(last_part) == 1:

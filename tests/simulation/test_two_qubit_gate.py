@@ -53,12 +53,14 @@ def _run_sim(t_circ, nqubits, gates, circuit_class, shots=200):
 @pytest.mark.parametrize("circuit_class", [EfficientCircuit])
 def test_non_consecutive_cnot_flips_target(circuit_class):
     """CNOT on non-consecutive qubits (4, 15): control |1>, target |0> -> target flips to |1>."""
+    # Arrange
     nqubits = 16
     qc = QuantumCircuit(nqubits, nqubits)
     qc.x(4)
     qc.cx(4, 15)
     qc.measure(range(nqubits), range(nqubits))
 
+    # Act
     # Check what AER says first
     aer_probs = _aer_reference(qc, nqubits)
     print(f"AER dominant outcome: {max(aer_probs, key=aer_probs.get)}")
@@ -67,6 +69,7 @@ def test_non_consecutive_cnot_flips_target(circuit_class):
     t_circ = _transpile_circuit(qc, nqubits)
     result = _run_sim(t_circ, nqubits, almost_noise_free_gates, circuit_class, shots=200)
 
+    # Assert
     # Compare dominant outcomes
     aer_dominant = max(aer_probs, key=aer_probs.get)
     mr_dominant = max(result["mid_counts"], key=result["probs"].get)
@@ -78,13 +81,17 @@ def test_non_consecutive_cnot_flips_target(circuit_class):
 @pytest.mark.parametrize("circuit_class", [EfficientCircuit])
 def test_non_consecutive_cnot_control_zero_no_flip(circuit_class):
     """CNOT on non-consecutive qubits (4, 15): control |0> -> target should not flip."""
+    # Arrange
     nqubits = 16
     qc = QuantumCircuit(nqubits, nqubits)
     qc.cx(4, 15)
     qc.measure(range(nqubits), range(nqubits))
+
+    # Act
     t_circ = _transpile_circuit(qc, nqubits)
     result = _run_sim(t_circ, nqubits, almost_noise_free_gates, circuit_class, shots=200)
 
+    # Assert
     zero_state = "0" * nqubits
     p_zero = result["mid_counts"].get(zero_state, 0.0)
     assert p_zero > 0.95, (
@@ -95,14 +102,18 @@ def test_non_consecutive_cnot_control_zero_no_flip(circuit_class):
 @pytest.mark.parametrize("circuit_class", [EfficientCircuit])
 def test_non_consecutive_cnot_middle_qubits_unaffected(circuit_class):
     """CNOT on qubits (4, 15): qubits 5-14 should be unaffected."""
+    # Arrange
     nqubits = 16
     qc = QuantumCircuit(nqubits, nqubits)
     qc.x(4)
     qc.cx(4, 15)
     qc.measure(range(nqubits), range(nqubits))
+
+    # Act
     t_circ = _transpile_circuit(qc, nqubits)
     result = _run_sim(t_circ, nqubits, almost_noise_free_gates, circuit_class, shots=200)
 
+    # Assert
     for bitstr, p in result["mid_counts"].items():
         if p > 0.01:
             # qubits 5-14 should all be 0
@@ -118,6 +129,7 @@ def test_non_consecutive_cnot_middle_qubits_unaffected(circuit_class):
 def test_non_consecutive_matches_consecutive_noiseless(circuit_class):
     """H on qubit 4 + CNOT(4,15) and H on qubit 4 + CNOT(4,5) should both
     produce a 50/50 split between exactly two basis states."""
+    # Arrange
     nqubits = 16
 
     qc_non_consec = QuantumCircuit(nqubits, nqubits)
@@ -130,6 +142,7 @@ def test_non_consecutive_matches_consecutive_noiseless(circuit_class):
     qc_consec.cx(4, 5)
     qc_consec.measure(range(nqubits), range(nqubits))
 
+    # Act
     t_non_consec = _transpile_circuit(qc_non_consec, nqubits)
     t_consec = _transpile_circuit(qc_consec, nqubits)
 
@@ -142,6 +155,7 @@ def test_non_consecutive_matches_consecutive_noiseless(circuit_class):
     total = sum(result_c["mid_counts"].values())
     result_c["mid_counts"] = {k: v / total for k, v in result_c["mid_counts"].items()}
 
+    # Assert
     assert np.isclose(sum(result_nc["mid_counts"].values()), 1.0, atol=0.01)
     assert np.isclose(sum(result_c["mid_counts"].values()),  1.0, atol=0.01)
 
@@ -154,14 +168,18 @@ def test_non_consecutive_matches_consecutive_noiseless(circuit_class):
 def test_non_consecutive_bell_state_correlations(circuit_class):
     """H on qubit 4 + CNOT(4,15) should entangle qubits 4 and 15,
     with all other qubits remaining in |0>."""
+    # Arrange
     nqubits = 16
     qc = QuantumCircuit(nqubits, nqubits)
     qc.h(4)
     qc.cx(4, 15)
     qc.measure(range(nqubits), range(nqubits))
+
+    # Act
     t_circ = _transpile_circuit(qc, nqubits)
     result = _run_sim(t_circ, nqubits, almost_noise_free_gates, circuit_class, shots=500)
 
+    # Assert
     for bitstr, p in result["mid_counts"].items():
         if p > 0.05:
             q4  = bitstr[-(4+1)]
@@ -182,13 +200,16 @@ def test_non_consecutive_bell_state_correlations(circuit_class):
 @pytest.mark.parametrize("circuit_class", [EfficientCircuit])
 def test_non_consecutive_noiseless_higher_fidelity_than_noisy(circuit_class):
     """Noiseless non-consecutive CNOT(4,15) should give higher fidelity than noisy."""
+    # Arrange
     nqubits = 16
     qc = QuantumCircuit(nqubits, nqubits)
     qc.x(4)
     qc.cx(4, 15)
     qc.measure(range(nqubits), range(nqubits))
+    
     t_circ = _transpile_circuit(qc, nqubits)
 
+    # Act
     result_clean = _run_sim(t_circ, nqubits, almost_noise_free_gates, circuit_class, shots=300)
     result_noisy = _run_sim(t_circ, nqubits, standard_gates,           circuit_class, shots=300)
 
@@ -201,6 +222,7 @@ def test_non_consecutive_noiseless_higher_fidelity_than_noisy(circuit_class):
     p_clean = result_clean["mid_counts"].get(target_str, 0.0)
     p_noisy = result_noisy["mid_counts"].get(target_str, 0.0)
 
+    # Assert
     assert p_clean > p_noisy, (
         f"Expected noiseless to have higher fidelity than noisy "
         f"but got p_clean={p_clean:.4f} <= p_noisy={p_noisy:.4f}"
@@ -214,12 +236,15 @@ def test_non_consecutive_noiseless_higher_fidelity_than_noisy(circuit_class):
 def test_non_consecutive_noise_params_preserved(circuit_class):
     """Non-consecutive gate should use noise params of the actual qubits —
     verified by checking noiseless gives near-ideal result."""
+    # Arrange
     nqubits = 16
     qc = QuantumCircuit(nqubits, nqubits)
     qc.x(4)
     qc.cx(4, 15)
     qc.measure(range(nqubits), range(nqubits))
     t_circ = _transpile_circuit(qc, nqubits)
+
+    # Act
     result = _run_sim(t_circ, nqubits, almost_noise_free_gates, circuit_class, shots=300)
 
     target = ["0"] * nqubits
@@ -228,6 +253,8 @@ def test_non_consecutive_noise_params_preserved(circuit_class):
     target_str = "".join(target)
 
     p = result["mid_counts"].get(target_str, 0.0)
+
+    # Assert
     assert p > 0.90, (
         f"Expected P(target) > 0.90 for noiseless CNOT(4,15) "
         f"but got {p:.4f} (probs={result['mid_counts']})"
@@ -239,22 +266,27 @@ def test_non_consecutive_noise_params_preserved(circuit_class):
 def test_non_consecutive_gate_completes_without_error(circuit_class):
     """Non-consecutive two-qubit gate should run through the full pipeline
     without raising any exception."""
+    # Arrange
     nqubits = 16
     qc = QuantumCircuit(nqubits, nqubits)
     qc.cx(4, 15)
     qc.measure(range(nqubits), range(nqubits))
     t_circ = _transpile_circuit(qc, nqubits)
+
+    # Act
     result = _run_sim(t_circ, nqubits, almost_noise_free_gates, circuit_class, shots=100)
 
     total = sum(result["mid_counts"].values())
     result["mid_counts"] = {k: v / total for k, v in result["mid_counts"].items()}
 
+    # Assert
     assert "mid_counts" in result
     assert np.isclose(sum(result["mid_counts"].values()), 1.0, atol=0.01)
 
 @pytest.mark.parametrize("circuit_class", [EfficientCircuit])
 def test_non_consecutive_gate_mixed_with_consecutive(circuit_class):
     """Circuit with both consecutive and non-consecutive gates should run correctly."""
+    # Arrange
     nqubits = 16
     qc = QuantumCircuit(nqubits, nqubits)
     qc.h(4)
@@ -262,12 +294,14 @@ def test_non_consecutive_gate_mixed_with_consecutive(circuit_class):
     qc.cx(4, 15)     # non-consecutive
     qc.measure(range(nqubits), range(nqubits))
     t_circ = _transpile_circuit(qc, nqubits)
+
+    # Act
     result = _run_sim(t_circ, nqubits, almost_noise_free_gates, circuit_class, shots=300)
     
     total = sum(result["mid_counts"].values())
     result["mid_counts"] = {k: v / total for k, v in result["mid_counts"].items()}
 
-    
+    # Assert
     assert "mid_counts" in result
     assert np.isclose(sum(result["mid_counts"].values()), 1.0, atol=0.01)
     assert len(result["mid_counts"]) > 0
@@ -275,6 +309,7 @@ def test_non_consecutive_gate_mixed_with_consecutive(circuit_class):
 @pytest.mark.parametrize("circuit_class", [EfficientCircuit])
 def test_non_consecutive_gate_with_mid_measurement(circuit_class):
     """Non-consecutive gate followed by a mid-circuit measurement should work end-to-end."""
+    # Arrange
     nqubits = 16
     qc = QuantumCircuit(nqubits, nqubits + 1)
     qc.x(4)
@@ -283,17 +318,21 @@ def test_non_consecutive_gate_with_mid_measurement(circuit_class):
     qc.barrier()
     qc.measure(range(nqubits), range(nqubits))
     t_circ = _transpile_circuit(qc, nqubits)
+
+    # Act
     result = _run_sim(t_circ, nqubits, almost_noise_free_gates, circuit_class, shots=200)
     
     total = sum(result["mid_counts"].values())
     result["mid_counts"] = {k: v / total for k, v in result["mid_counts"].items()}
 
+    # Assert
     assert "mid_counts" in result
     assert np.isclose(sum(result["mid_counts"].values()), 1.0, atol=0.01)
 
 @pytest.mark.parametrize("circuit_class", [EfficientCircuit])
 def test_non_consecutive_gate_result_is_reproducible(circuit_class):
     """Two runs should give similar probability distributions."""
+    # Arrange
     nqubits = 16
     qc = QuantumCircuit(nqubits, nqubits)
     qc.h(4)
@@ -301,11 +340,14 @@ def test_non_consecutive_gate_result_is_reproducible(circuit_class):
     qc.measure(range(nqubits), range(nqubits))
     t_circ = _transpile_circuit(qc, nqubits)
 
+    # Act
     result1 = _run_sim(t_circ, nqubits, almost_noise_free_gates, circuit_class, shots=500)
     result2 = _run_sim(t_circ, nqubits, almost_noise_free_gates, circuit_class, shots=500)
 
     dominant1 = {k for k, v in result1["mid_counts"].items() if v > 0.1}
     dominant2 = {k for k, v in result2["mid_counts"].items() if v > 0.1}
+
+    # Assert
     assert dominant1 == dominant2, (
         f"Dominant outcomes differ between runs: {dominant1} vs {dominant2}"
     )
