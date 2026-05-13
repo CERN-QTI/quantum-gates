@@ -3,7 +3,7 @@ import os
 import pytest
 
 from src.quantum_gates.utilities import post_process_split
-from src.quantum_gates._utility.simulations_utility import apply_phase_to_qubit, apply_phase_corrections, compute_born_probability, collapse_statevector
+from src.quantum_gates._utility.simulations_utility import apply_phase_to_qubit, apply_phase_corrections, compute_born_probability, collapse_statevector, permute_to_adjacent, permute_back
 from tests.helpers.paths import helper_path
 
 
