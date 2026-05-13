@@ -659,9 +659,9 @@ def test_array_mid_measure_deterministic_parametrized(
             f"Expected grouped mid outcomes {expected_mid}, got {grouped}"
         )
 
-    probs = result["probs"]
+    probs = result["mid_counts"]
     assert probs.get(expected_final, 0.0) > 0.95, (
-        f"Expected final state |{expected_final}> but got probs={probs}"
+        f"Expected final state |{expected_final}> but got probs={probs} \n probs.get('{expected_final}', 0.0)={probs.get(expected_final, 0.0):.4f}"
     )
 
 
@@ -781,40 +781,6 @@ def _group_mid_events_by_round(mid_events, nqubits, n_mid, n_rounds):
         grouped.append([int(event["outcome"][0]) for event in round_events])
 
     return grouped
-
-
-def _deterministic_array_mid_measure_circuit(nqubits, init_ones, measure_qubits, n_rounds=1):
-    """Build deterministic circuits with array-style mid-circuit measurements.
-
-    Each round measures `measure_qubits` using one array-style qc.measure(...) call.
-    """
-    n_mid = len(measure_qubits)
-    n_clbits = nqubits + n_rounds * n_mid
-    qc = QuantumCircuit(nqubits, n_clbits)
-
-    for q in init_ones:
-        qc.x(q)
-
-    for r in range(n_rounds):
-        c_start = nqubits + r * n_mid
-        qc.measure(measure_qubits, range(c_start, c_start + n_mid))
-
-        # Keep measurements mid-circuit.
-        for q in measure_qubits:
-            qc.rz(0.001, q)
-
-        qc.barrier()
-
-    qc.measure(range(nqubits), range(nqubits))
-
-    expected_mid = [
-        [1 if q in init_ones else 0 for q in measure_qubits]
-        for _ in range(n_rounds)
-    ]
-
-    expected_final = "".join("1" if q in init_ones else "0" for q in reversed(range(nqubits)))
-
-    return qc, expected_mid, expected_final
 
 
 @pytest.mark.parametrize(

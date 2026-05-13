@@ -69,7 +69,7 @@ def test_non_consecutive_cnot_flips_target(circuit_class):
 
     # Compare dominant outcomes
     aer_dominant = max(aer_probs, key=aer_probs.get)
-    mr_dominant = max(result["probs"], key=result["probs"].get)
+    mr_dominant = max(result["mid_counts"], key=result["probs"].get)
     assert aer_dominant == mr_dominant, (
         f"MrAnderson dominant outcome '{mr_dominant}' does not match "
         f"AER '{aer_dominant}'"
