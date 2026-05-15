@@ -8,9 +8,10 @@ from src.quantum_gates.simulators import MrAndersonSimulator
 from src.quantum_gates.circuits import EfficientCircuit, BinaryCircuit
 from src.quantum_gates.gates import standard_gates, almost_noise_free_gates
 from src.quantum_gates.utilities import DeviceParameters
+from tests.helpers.paths import device_parameters_path
 
 _backend = FakeBrisbane()
-_location = "tests/helpers/device_parameters/ibm_kyoto/"
+_location = device_parameters_path("ibm_kyoto")
 _LAYOUT = [0, 1, 2, 3, 4]
 
 def _device_param(nqubits):
