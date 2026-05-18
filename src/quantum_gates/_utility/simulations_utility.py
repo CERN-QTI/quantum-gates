@@ -246,6 +246,7 @@ def create_random_quantum_circuit(n_qubit: int, depth: int, seed_circ: int, meas
 
     return circ
 
+
 def transpile_qiskit_circuit(circ : QuantumCircuit, init_layout: list, seed: int, backend: Backend) -> QuantumCircuit:
         """Function to transpile a circuit using the optimal option for this backend.
 
@@ -304,6 +305,7 @@ def pretty_print_data(data):
                         f"qubits={[q._index for q in op.qubits]} "
                         f"clbits={[c._index for c in op.clbits]}"
                     )
+
 
 def sv_normal_to_qiskit(sv: np.ndarray | Statevector) -> np.ndarray:
 

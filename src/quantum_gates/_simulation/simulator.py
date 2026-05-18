@@ -257,7 +257,7 @@ class MrAndersonSimulator(object):
             raise ValueError(f"Expected positive number of shots but found {shots}.")
 
         # Cross check number of qubits
-        # psi0 must match the number of **used** qubits
+        # psi0 must match the number of used qubits
         if psi0.shape != (2**nqubit,):
             raise ValueError(f"psi0 shape {psi0.shape} is incompatible with nqubit={nqubit} (expected {(2**nqubit,)}).")
 
@@ -684,13 +684,12 @@ def _single_shot(args: dict) -> np.array:
     circ.reset(phase_reset=True)  # Reset internal state before starting
     
     for idx, (d, flag) in enumerate(data):
-        if flag == 0:      
+        if flag == 0:    # Normal gates chunk: apply gates and update statevector  
             _apply_gates_on_circuit(d, circ, device_param, qubit_layout)
             psi = circ.statevector(psi)
             circ.reset(phase_reset=False)  # Reset internal state for next chunk
 
-        elif flag == 1:
-            
+        elif flag == 1: # Fancy gate: mid-circuit measurement, reset, or statevector readout
             if isinstance(d, tuple) and d[0] == "mid_measurement":
                 op = d[1]
                 qubits  = op["q_idx"]
@@ -768,7 +767,7 @@ def _single_shot(args: dict) -> np.array:
                 else:
                     raise ValueError(f"Unknown / not yet implemented gate: {op_name}")
         
-        elif flag == 2:
+        elif flag == 2: # Non-consecutive two-qubit gate: permute, apply, and permute back
             n = circ.nqubit
             # Unpack dict
             T1, T2, p, rout, p_int, t_int, tm, dt = (
@@ -787,7 +786,7 @@ def _single_shot(args: dict) -> np.array:
             q_ctr_v = qubit_layout.index(q_ctr_r)
             q_trg_v = qubit_layout.index(q_trg_r)
             
-            # 1. Permute psi so the two qubits are adjacent
+            # Permute psi so the two qubits are adjacent
             psi_permuted, perm = permute_to_adjacent(psi, q_ctr_v, q_trg_v, n)
             op_name = d.operation.name
             # Apply gate at positions 0 and 1
@@ -808,21 +807,19 @@ def _single_shot(args: dict) -> np.array:
             else:
                 raise ValueError(f"Unknown / not yet implemented gate: {op_name}")
 
-            # Identity on all remaining qubits
             for k in range(2, n):
                 circ.I(k)
             
             psi_permuted = circ.statevector(psi_permuted)
             circ.reset(phase_reset=False)
     
-            # 3. Permute psi back
+            # Permute psi back
             psi = permute_back(psi_permuted, perm, n)
             
     # Mid_measurement results in Qiskit clbit order
     qiskit_order_mid_results = mid_results[::-1]  
 
     # Final Measurements
-    # Calculate the probability distribution from the Born rule
     shot_result = np.square(np.abs(psi))
 
     # Final outcomes from last measurement

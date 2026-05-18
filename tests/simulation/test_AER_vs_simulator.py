@@ -25,6 +25,7 @@ def _transpile_mr_anderson(circ, nqubits):
         optimization_level=0,
     )
 
+
 def _run_mr_anderson(t_circ, nqubits, circuit_class, shots=500):
     psi0 = np.zeros(2**nqubits, dtype=complex)
     psi0[0] = 1
@@ -40,6 +41,7 @@ def _run_mr_anderson(t_circ, nqubits, circuit_class, shots=500):
     total = sum(counts.values())
     return {k: v/total for k, v in counts.items()}
 
+
 def _run_aer(circ, shots=2000):
     sim = AerSimulator()
     t_circ = transpile(circ, sim)
@@ -48,8 +50,10 @@ def _run_aer(circ, shots=2000):
     total = sum(counts.values())
     return {k: v/total for k, v in counts.items()}
 
+
 def _dominant_outcomes(probs, threshold=0.05):
     return {k for k, v in probs.items() if v > threshold}
+
 
 def _assert_matches_aer(qc, nqubits, circuit_class, shots_mr=500, shots_aer=2000):
     t_circ = _transpile_mr_anderson(qc, nqubits)
@@ -62,7 +66,6 @@ def _assert_matches_aer(qc, nqubits, circuit_class, shots_mr=500, shots_aer=2000
         f"AER dominant outcomes {aer_dominant}"
     )
 
-# ── Single qubit gates ────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("circuit_class", [EfficientCircuit, BinaryCircuit])
 def test_aer_match_x_gate(circuit_class):
@@ -72,8 +75,7 @@ def test_aer_match_x_gate(circuit_class):
     qc = QuantumCircuit(nqubits, nqubits)
     qc.x(0)
     qc.measure(range(nqubits), range(nqubits))
-    #Just to make sure the measurement is actually a mid-circuit measurement and not just at the end
-
+    
     # Act & Assert
     _assert_matches_aer(qc, nqubits, circuit_class)
 
@@ -86,7 +88,6 @@ def test_aer_match_hadamard(circuit_class):
     qc = QuantumCircuit(nqubits, nqubits)
     qc.h(0)
     qc.measure(range(nqubits), range(nqubits))
-    #Just to make sure the measurement is actually a mid-circuit measurement and not just at the end
     
     # Act & Assert
     _assert_matches_aer(qc, nqubits, circuit_class)
@@ -101,8 +102,7 @@ def test_aer_match_x_on_all_qubits(circuit_class):
     for q in range(nqubits):
         qc.x(q)
     qc.measure(range(nqubits), range(nqubits))
-    #Just to make sure the measurement is actually a mid-circuit measurement and not just at the end
-    
+      
     # Act & Assert
     _assert_matches_aer(qc, nqubits, circuit_class)
 
@@ -115,13 +115,10 @@ def test_aer_match_rz_gate(circuit_class):
     qc = QuantumCircuit(nqubits, nqubits)
     qc.rz(np.pi / 4, 0)
     qc.measure(range(nqubits), range(nqubits))
-    #Just to make sure the measurement is actually a mid-circuit measurement and not just at the end
-    
+      
     # Act & Assert
     _assert_matches_aer(qc, nqubits, circuit_class)
 
-
-# ── Two qubit gates ───────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("circuit_class", [EfficientCircuit, BinaryCircuit])
 def test_aer_match_cnot_flips_target(circuit_class):
@@ -132,7 +129,6 @@ def test_aer_match_cnot_flips_target(circuit_class):
     qc.x(0)
     qc.cx(0, 1)
     qc.measure(range(nqubits), range(nqubits))
-    #Just to make sure the measurement is actually a mid-circuit measurement and not just at the end
     
     # Act & Assert
     _assert_matches_aer(qc, nqubits, circuit_class)
@@ -146,7 +142,6 @@ def test_aer_match_cnot_control_zero(circuit_class):
     qc = QuantumCircuit(nqubits, nqubits)
     qc.cx(0, 1)
     qc.measure(range(nqubits), range(nqubits))
-    #Just to make sure the measurement is actually a mid-circuit measurement and not just at the end
     
     # Act & Assert
     _assert_matches_aer(qc, nqubits, circuit_class)
@@ -161,7 +156,6 @@ def test_aer_match_bell_state(circuit_class):
     qc.h(0)
     qc.cx(0, 1)
     qc.measure(range(nqubits), range(nqubits))
-    #Just to make sure the measurement is actually a mid-circuit measurement and not just at the end
     
     # Act & Assert
     _assert_matches_aer(qc, nqubits, circuit_class)
@@ -177,13 +171,10 @@ def test_aer_match_ghz_state(circuit_class):
     qc.cx(0, 1)
     qc.cx(1, 2)
     qc.measure(range(nqubits), range(nqubits))
-    #Just to make sure the measurement is actually a mid-circuit measurement and not just at the end
     
     # Act & Assert
     _assert_matches_aer(qc, nqubits, circuit_class)
 
-
-# ── Mid-circuit measurements ──────────────────────────────────────────────────
 
 @pytest.mark.parametrize("circuit_class", [EfficientCircuit, BinaryCircuit])
 def test_aer_match_mid_measurement_zero_state(circuit_class):
@@ -194,7 +185,6 @@ def test_aer_match_mid_measurement_zero_state(circuit_class):
     qc.measure(0, nqubits)
     qc.barrier()
     qc.measure(range(nqubits), range(nqubits))
-    #Just to make sure the measurement is actually a mid-circuit measurement and not just at the end
     
     # Act & Assert
     _assert_matches_aer(qc, nqubits, circuit_class)
@@ -210,13 +200,10 @@ def test_aer_match_mid_measurement_after_x(circuit_class):
     qc.measure(0, nqubits)
     qc.barrier()
     qc.measure(range(nqubits), range(nqubits))
-    #Just to make sure the measurement is actually a mid-circuit measurement and not just at the end
     
     # Act & Assert
     _assert_matches_aer(qc, nqubits, circuit_class)
 
-
-# ── Reset ─────────────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("circuit_class", [EfficientCircuit, BinaryCircuit])
 def test_aer_match_reset_after_x(circuit_class):
@@ -228,7 +215,6 @@ def test_aer_match_reset_after_x(circuit_class):
     qc.reset(0)
     qc.barrier()
     qc.measure(range(nqubits), range(nqubits))
-    #Just to make sure the measurement is actually a mid-circuit measurement and not just at the end
     
     # Act & Assert
     _assert_matches_aer(qc, nqubits, circuit_class)
@@ -245,13 +231,10 @@ def test_aer_match_reset_bell_state(circuit_class):
     qc.reset(0)
     qc.barrier()
     qc.measure(range(nqubits), range(nqubits))
-    #Just to make sure the measurement is actually a mid-circuit measurement and not just at the end
     
     # Act & Assert
     _assert_matches_aer(qc, nqubits, circuit_class)
 
-
-# ── Deeper circuits ───────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("circuit_class", [EfficientCircuit, BinaryCircuit])
 def test_aer_match_alternating_x_cnot(circuit_class):
@@ -264,7 +247,6 @@ def test_aer_match_alternating_x_cnot(circuit_class):
     qc.x(2)
     qc.cx(1, 2)
     qc.measure(range(nqubits), range(nqubits))
-    #Just to make sure the measurement is actually a mid-circuit measurement and not just at the end
     
     # Act & Assert
     _assert_matches_aer(qc, nqubits, circuit_class)
@@ -279,7 +261,6 @@ def test_aer_match_hadamard_on_all_qubits(circuit_class):
     for q in range(nqubits):
         qc.h(q)
     qc.measure(range(nqubits), range(nqubits))
-    #Just to make sure the measurement is actually a mid-circuit measurement and not just at the end
     
     # Act & Assert
     _assert_matches_aer(qc, nqubits, circuit_class)
@@ -299,7 +280,6 @@ def test_aer_match_multi_cycle_stabilizer(circuit_class):
     qc.measure(1, nqubits + 1)
     qc.barrier()
     qc.measure(range(nqubits), range(nqubits))
-    #Just to make sure the measurement is actually a mid-circuit measurement and not just at the end
     
     # Act & Assert
     _assert_matches_aer(qc, nqubits, circuit_class)
