@@ -6,7 +6,13 @@ import functools as ft
 
 from .._gates.gates import Gates
 from .backend import StandardBackend, EfficientBackend, BackendForOnes, BinaryBackend
-from .._utility.simulations_utility import apply_phase_to_qubit, apply_phase_corrections, compute_born_probability, collapse_statevector
+from .._utility.simulations_utility import (
+    apply_phase_to_qubit,
+    apply_phase_corrections,
+    collapse_statevector,
+    compute_born_probabilities,
+    scale_collapsed_statevector,
+)
 
 
 class Circuit(object):
@@ -174,8 +180,7 @@ class Circuit(object):
                 self.reset(phase_reset=False)
 
             # Born probabilities (big-endian: qubit 0 = most significant)
-            p0 = compute_born_probability(psi, target_qubit, n)
-            p1 = 1.0 - p0
+            p0, p1 = compute_born_probabilities(psi, target_qubit, n)
             # Numerical guard
             if p0 < 0.0: p0 = 0.0
             if p1 < 0.0: p1 = 0.0
@@ -187,18 +192,15 @@ class Circuit(object):
                 outcome = 0
             # Normal case
             else:
-                p0 /= s; p1 /= s
-                outcome = np.random.choice([0, 1], p=[p0, p1])
+                p0_cond, p1_cond = p0 / s, p1 / s
+                outcome = np.random.choice([0, 1], p=[p0_cond, p1_cond])
             # Record outcome in qubit order
             outcomes_in_q_order.append(outcome)
 
             # Collapse on outcome onto psi
             psi = collapse_statevector(psi, target_qubit, outcome, n)
-
-            # Renormalize
-            norm = np.linalg.norm(psi)
-            if norm > 0.0:
-                psi /= norm
+            outcome_probability = p0 if outcome == 0 else p1
+            psi = scale_collapsed_statevector(psi, outcome_probability, s)
 
             # Optionally record to classical bit mapping
             if write_cb:
@@ -573,8 +575,7 @@ class AlternativeCircuit(object):
                 self.reset(phase_reset=False)
 
             # Born probabilities (big-endian: qubit 0 = most significant)
-            p0 = compute_born_probability(psi, target_qubit, n)
-            p1 = 1.0 - p0
+            p0, p1 = compute_born_probabilities(psi, target_qubit, n)
             # numerical guard 
             if p0 < 0.0: p0 = 0.0
             if p1 < 0.0: p1 = 0.0
@@ -586,18 +587,15 @@ class AlternativeCircuit(object):
                 outcome = 0
             # normal case
             else:
-                p0 /= s; p1 /= s
-                outcome = np.random.choice([0, 1], p=[p0, p1])
+                p0_cond, p1_cond = p0 / s, p1 / s
+                outcome = np.random.choice([0, 1], p=[p0_cond, p1_cond])
             # record outcome in qubit order
             outcomes_in_q_order.append(outcome)
 
             # Collapse on outcome onto psi
             psi = collapse_statevector(psi, target_qubit, outcome, n)
-
-            # Renormalize
-            norm = np.linalg.norm(psi)
-            if norm > 0.0:
-                psi /= norm
+            outcome_probability = p0 if outcome == 0 else p1
+            psi = scale_collapsed_statevector(psi, outcome_probability, s)
             
             # Optionally record to classical bit mapping
             if write_cb:
@@ -992,8 +990,7 @@ class BinaryCircuit(object):
                 self.reset(phase_reset=False)
 
             # Born probabilities (big-endian: qubit 0 = most significant)
-            p0 = compute_born_probability(psi, target_qubit, n)
-            p1 = 1.0 - p0
+            p0, p1 = compute_born_probabilities(psi, target_qubit, n)
             # numerical guard 
             if p0 < 0.0: p0 = 0.0
             if p1 < 0.0: p1 = 0.0
@@ -1005,18 +1002,15 @@ class BinaryCircuit(object):
                 outcome = 0
             # normal case
             else:
-                p0 /= s; p1 /= s
-                outcome = np.random.choice([0, 1], p=[p0, p1])
+                p0_cond, p1_cond = p0 / s, p1 / s
+                outcome = np.random.choice([0, 1], p=[p0_cond, p1_cond])
             # record outcome in qubit order
             outcomes_in_q_order.append(outcome)
 
             # Collapse on outcome onto psi
             psi = collapse_statevector(psi, target_qubit, outcome, n)
-
-            # Renormalize
-            norm = np.linalg.norm(psi)
-            if norm > 0.0:
-                psi /= norm
+            outcome_probability = p0 if outcome == 0 else p1
+            psi = scale_collapsed_statevector(psi, outcome_probability, s)
             
             # Optionally record to classical bit mapping
             if write_cb:
