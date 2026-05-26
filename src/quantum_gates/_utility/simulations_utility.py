@@ -585,14 +585,12 @@ def apply_phase_corrections(psi0: np.array, phases: list) -> np.array:
     return psi
 
 
-def compute_born_probability(psi: np.ndarray, target_qubit: int, n: int) -> float:
-    """Compute the unnormalized probability of measuring 0 on target_qubit."""
-    p0, _ = compute_born_probabilities(psi, target_qubit, n)
-    return p0
-
-
 def compute_born_probabilities(psi: np.ndarray, target_qubit: int, n: int) -> tuple[float, float]:
-    """Compute unnormalized Born probabilities for measuring 0 and 1."""
+    """Compute raw Born probabilities for measuring 0 and 1.
+
+    The returned values are not normalized. For an unnormalized input state,
+    ``p0 + p1`` equals ``<psi|psi>`` rather than one.
+    """
     dim = psi.shape[0]
     indices = np.arange(dim)
     target_bits = (indices >> (n - 1 - target_qubit)) & 1
