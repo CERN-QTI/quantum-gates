@@ -2,11 +2,16 @@ import numpy as np
 import os
 import pytest
 
-from src.quantum_gates.utilities import post_process_split
-from src.quantum_gates._utility.simulations_utility import apply_phase_to_qubit, apply_phase_corrections, compute_born_probability, collapse_statevector
+from src.quantum_gates.utilities import compute_born_probabilities, post_process_split
+from src.quantum_gates._utility.simulations_utility import (
+    apply_phase_corrections,
+    apply_phase_to_qubit,
+    collapse_statevector,
+)
+from tests.helpers.paths import helper_path
 
 
-location = 'tests/helpers/result_samples'
+location = helper_path("result_samples")
 
 
 def test_apply_phase_to_qubit_raises_on_real_array():
@@ -212,46 +217,85 @@ def test_post_process_split_mean():
         os.remove(f)
 
 
-def test_born_prob_zero_state():
-    # |0> state: probability of measuring 0 should be 1.0
+def test_born_probabilities_zero_state():
+    # Arrange
     psi = np.array([1.0, 0.0], dtype=complex)
-    assert np.isclose(compute_born_probability(psi, target_qubit=0, n=1), 1.0)
 
-def test_born_prob_one_state():
-    # |1> state: probability of measuring 0 should be 0.0
+    # Act
+    p0, p1 = compute_born_probabilities(psi, target_qubit=0, n=1)
+
+    # Assert
+    assert np.isclose(p0, 1.0)
+    assert np.isclose(p1, 0.0)
+
+
+def test_born_probabilities_one_state():
+    # Arrange
     psi = np.array([0.0, 1.0], dtype=complex)
-    assert np.isclose(compute_born_probability(psi, target_qubit=0, n=1), 0.0)
+
+    # Act
+    p0, p1 = compute_born_probabilities(psi, target_qubit=0, n=1)
+
+    # Assert
+    assert np.isclose(p0, 0.0)
+    assert np.isclose(p1, 1.0)
 
 
-def test_born_probability_superposition():
-    # |+> state: p0 should be 0.5
+def test_born_probabilities_superposition():
+    # Arrange
     psi = np.array([1, 1], dtype=complex) / np.sqrt(2)
-    assert np.isclose(compute_born_probability(psi, 0, 1), 0.5)
 
-def test_born_prob_sums_to_one():
-    # p0 + p1 should always equal 1 for a normalised statevector
+    # Act
+    p0, p1 = compute_born_probabilities(psi, target_qubit=0, n=1)
+
+    # Assert
+    assert np.isclose(p0, 0.5)
+    assert np.isclose(p1, 0.5)
+
+
+def test_born_probabilities_sum_to_one_for_normalized_state():
+    # Arrange
     rng = np.random.default_rng(0)
     psi = rng.random(2**3) + 1j * rng.random(2**3)
     psi /= np.linalg.norm(psi)
-    p0 = compute_born_probability(psi, target_qubit=1, n=3)
-    assert np.isclose(p0 + (1.0 - p0), 1.0)
 
-def test_old_vs_new_born_probability():
-    # compare old loop implementation against new vectorised one
+    # Act
+    p0, p1 = compute_born_probabilities(psi, target_qubit=1, n=3)
+
+    # Assert
+    assert np.isclose(p0 + p1, 1.0)
+
+
+def test_born_probabilities_sum_to_state_weight_for_unnormalized_state():
+    # Arrange
+    psi = np.array([np.sqrt(0.20), np.sqrt(0.05)], dtype=complex)
+
+    # Act
+    p0, p1 = compute_born_probabilities(psi, target_qubit=0, n=1)
+
+    # Assert
+    assert np.isclose(p0, 0.20)
+    assert np.isclose(p1, 0.05)
+    assert np.isclose(p0 + p1, np.vdot(psi, psi).real)
+
+
+def test_born_probabilities_match_loop_implementation():
+    # Arrange
     psi = np.random.rand(2**4) + 1j * np.random.rand(2**4)
     psi /= np.linalg.norm(psi)
     n = 4
     target = 2
-
-    # old
-    p0_old = 0.0
+    expected = [0.0, 0.0]
     for idx, amp in enumerate(psi):
-        if ((idx >> (n - 1 - target)) & 1) == 0:
-            p0_old += amp.real**2 + amp.imag**2
+        measured_bit = (idx >> (n - 1 - target)) & 1
+        expected[measured_bit] += amp.real**2 + amp.imag**2
 
-    # new
-    p0_new = compute_born_probability(psi, target, n)
-    assert np.isclose(p0_old, p0_new)
+    # Act
+    result = compute_born_probabilities(psi, target, n)
+
+    # Assert
+    assert np.allclose(result, expected)
+
 
 def test_collapse_zeros_out_correct_amplitudes():
     # |+> collapsed to 0: |1> amplitude should be zeroed

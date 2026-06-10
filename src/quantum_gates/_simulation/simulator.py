@@ -690,11 +690,6 @@ def _single_shot(args: dict) -> np.array:
                 outcome1 = [int(x) for x in np.atleast_1d(outcome)]
                 assert len(outcome1) == len(clbits), "Outcome/clbits length mismatch"
                 
-                # Normalize just in case
-                norm = np.linalg.norm(psi)
-                if norm > 0:
-                    psi /= norm
-
                 # Record debug info
                 mid_results.append({
                     "step": idx,

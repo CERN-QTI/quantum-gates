@@ -585,12 +585,30 @@ def apply_phase_corrections(psi0: np.array, phases: list) -> np.array:
     return psi
 
 
-def compute_born_probability(psi: np.ndarray, target_qubit: int, n: int) -> float:
-    """Compute the probability of measuring 0 on target_qubit using Born's rule."""
+def compute_born_probabilities(psi: np.ndarray, target_qubit: int, n: int) -> tuple[float, float]:
+    """Compute raw Born probabilities for measuring 0 and 1.
+
+    The returned values are not normalized. For an unnormalized input state,
+    ``p0 + p1`` equals ``<psi|psi>`` rather than one.
+    """
     dim = psi.shape[0]
     indices = np.arange(dim)
-    mask0 = ((indices >> (n - 1 - target_qubit)) & 1) == 0
-    return float(np.sum(np.abs(psi[mask0])**2))
+    target_bits = (indices >> (n - 1 - target_qubit)) & 1
+    amplitudes_squared = np.abs(psi) ** 2
+    p0 = float(np.sum(amplitudes_squared[target_bits == 0]))
+    p1 = float(np.sum(amplitudes_squared[target_bits == 1]))
+    return p0, p1
+
+
+def scale_collapsed_statevector(
+    psi: np.ndarray,
+    outcome_probability: float,
+    total_probability: float,
+) -> np.ndarray:
+    """Scale a collapsed unnormalized trajectory by the conditional probability."""
+    if outcome_probability > 0.0 and total_probability > 0.0:
+        psi *= np.sqrt(total_probability / outcome_probability)
+    return psi
 
 
 def collapse_statevector(psi: np.ndarray, target_qubit: int, outcome: int, n: int) -> np.ndarray:

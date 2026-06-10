@@ -15,12 +15,12 @@ from ._utility.simulations_utility import (
 )
 from ._utility.simulations_utility import (
     sv_normal_to_qiskit,
-    sv_qiskit_to_normal, 
-    extract_qubit_orders, 
+    sv_qiskit_to_normal,
+    extract_qubit_orders,
     permute_qiskit_sv_to_logical,
     permute_normal_sv_to_logical_normal,
-    compute_born_probability,
-    collapse_statevector
-    ) 
+    compute_born_probabilities,
+    collapse_statevector,
+)
 
 from ._utility.circ_optimizer import Optimizer
