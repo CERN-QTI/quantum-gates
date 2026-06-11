@@ -73,48 +73,43 @@ class RotatedSurfaceCodeLoom:
         matcher = pymatching.Matching(dem)
         return matcher, converter
 
-    def MrAnderson_run_circ_backend(self):
-        print("n_qubits:", self.n_qubits)
-        backend = FakeBrisbane() 
-        qubits_layout = list(range(self.n_qubits))
-        if self.noise:
-            set_gate = standard_gates
-        else:
-            set_gate = noise_free_gates
-        bit_flip_bool = False
-        sim = MrAndersonSimulator(gates=set_gate, CircuitClass=EfficientCircuit)
 
-        initial_psi = np.zeros(2**self.n_qubits)
-        initial_psi[0] = 1.0  # set |00...0⟩
+    def _build_initial_layout(self):
+        """
+        Maps each qubit index to its (row, col) position on the combined
+        rotated grid using:
+        Data qubit      (r, c, 0) -> (r+c,   d+c-r-1)
+        Stabilizer qubit (r, c, 1) -> (r+c-1, d+c-r-1)
+        Maps each logical qubit index to a physical qubit index on the
+        combined (2d-1) x (2d-1) rotated grid.
+        """
+        d = self.distance
+        grid_width = 2 * d - 1
+        initial_layout = [None] * self.n_qubits
+        qubit_to_grid = {}  # qubit_index -> (grid_row, grid_col)
+        grid_to_qubit = {}  # (grid_row, grid_col) -> qubit_index
 
-        device_param = DeviceParameters(qubits_layout)
-        device_param.load_from_backend(backend)
-        device_param_lookup = device_param.__dict__()
+        for channel, qubit_idx in self.q_register.items():
+            r, c, qubit_type = map(int, channel.label.strip("()").split(", "))
 
-        needs_controlflow = any(isinstance(op.operation, ControlFlowOp) for op in self.qiskit_circuit.data)
+            if qubit_type == 0:  # data qubit
+                grid_row = r + c
+                grid_col = d + c - r - 1
+            else:  # stabilizer qubit
+                grid_row = r + c - 1
+                grid_col = d + c - r - 1
 
-        t_circ = transpile(
-            self.qiskit_circuit,
-            backend,
-            initial_layout=qubits_layout,
-            seed_transpiler=42,
-            **({} if needs_controlflow else {"scheduling_method": "asap"})
-        )
+            qubit_to_grid[qubit_idx] = (grid_row, grid_col)
+            grid_to_qubit[(grid_row, grid_col)] = qubit_idx
 
-        print("Circuit transpiled")
-        # Run simulation
-        res  = sim.run( 
-            t_qiskit_circ=t_circ, 
-            psi0=initial_psi, 
-            shots=self.n_shots, 
-            device_param=device_param_lookup,
-            nqubit=self.n_qubits,
-            bit_flip_bool=bit_flip_bool,
-            )
-        print("Simulation complete")
-        return res["mid_counts"]
+            physical_idx = grid_row * grid_width + grid_col
 
-    def _get_device_parameters(self, backend):
+            initial_layout[qubit_idx] = physical_idx
+
+        return initial_layout
+
+
+    def _get_device_parameters(self, backend, topology):
         """
         This method loads single- and two-qubit noise parameters from a given
         backend into a DeviceParameters object and converts them into a lookup
@@ -156,7 +151,8 @@ class RotatedSurfaceCodeLoom:
                 device_param_lookup['p_int'][i, i+1] = found_p_int
                 device_param_lookup['p_int'][i+1, i] = found_p_int
         return device_param_lookup  
-    def _transpile_circ(self):
+    
+    def _transpile_circ(self, topology):
         """
         This function transpiles the input circuit using a fixed basis gate set
         and a nearest-neighbor coupling map. It also detects whether the circuit
@@ -165,21 +161,31 @@ class RotatedSurfaceCodeLoom:
         """
 
         needs_controlflow = any(isinstance(op.operation, ControlFlowOp) for op in self.qiskit_circuit.data)
-
-        cm = CouplingMap([(i, i+1) for i in range(self.n_qubits - 1)])
+        if topology == "linear":
+            initial_layout = list(range(self.n_qubits))
+            cm = CouplingMap([(i, i+1) for i in range(self.n_qubits - 1)])
+        elif topology == "grid":
+            d = self.distance
+            grid_width = 2 * d - 1
+            n_physical = grid_width * grid_width
+            cm = CouplingMap(
+                [(i, i+1) for i in range(n_physical - 1)] +
+                [(i, i + grid_width) for i in range(n_physical - grid_width)]
+            )
+            initial_layout = self._build_initial_layout()
 
         t_circ = transpile(
             self.qiskit_circuit,
             None,
             basis_gates=['ecr', 'rz', 'sx','x'],
             coupling_map=cm,
-            initial_layout=list(range(self.n_qubits)),
+            initial_layout=initial_layout,
             seed_transpiler=42,
             scheduling_method=needs_controlflow,
         )
         return t_circ
 
-    def MrAnderson_run_circ(self):
+    def MrAnderson_run_circ(self, topology):
         print("n_qubits:", self.n_qubits)
         backend = FakeBrisbane() 
         
@@ -193,9 +199,9 @@ class RotatedSurfaceCodeLoom:
         initial_psi = np.zeros(2**self.n_qubits)
         initial_psi[0] = 1.0  # set |00...0⟩
 
-        device_param_lookup = self._get_device_parameters(backend)
+        device_param_lookup = self._get_device_parameters(backend, topology)
 
-        t_circ = self._transpile_circ()
+        t_circ = self._transpile_circ(topology)
 
         print("Circuit transpiled")
         # Run simulation
@@ -255,11 +261,11 @@ class RotatedSurfaceCodeLoom:
                 noisy_lines.append(f'DEPOLARIZE1({self.p}) {qubits}')
         return noisy_lines
 
-    def run_circ(self, simulator="MrAnderson"):
+    def run_circ(self, simulator="MrAnderson", topology="linear"):
         if simulator == "MrAnderson":
             self.qiskit_circuit.barrier()
             self.qiskit_circuit.x(range(self.qiskit_circuit.num_qubits))
-            qiskit_result = self.MrAnderson_run_circ()
+            qiskit_result = self.MrAnderson_run_circ(topology)
         elif simulator == "AER":
             qiskit_result = self.AER_run_circ()
             
