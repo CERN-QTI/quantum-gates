@@ -24,5 +24,6 @@ from ._utility.simulations_utility import (
     permute_to_adjacent, 
     permute_back
     ) 
+from ._utility.RotatedSurfaceCodeLoom import RotatedSurfaceCodeLoom
 
 from ._utility.circ_optimizer import Optimizer
