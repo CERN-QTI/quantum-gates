@@ -20,7 +20,9 @@ from ._utility.simulations_utility import (
     permute_qiskit_sv_to_logical,
     permute_normal_sv_to_logical_normal,
     compute_born_probabilities,
-    collapse_statevector,
-)
+    collapse_statevector, 
+    permute_to_adjacent, 
+    permute_back
+    ) 
 
 from ._utility.circ_optimizer import Optimizer

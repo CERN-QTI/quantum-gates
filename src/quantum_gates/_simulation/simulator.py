@@ -11,7 +11,7 @@ from qiskit import QuantumCircuit
 from .._gates.gates import Gates, standard_gates
 from .._simulation.circuit import EfficientCircuit, BinaryCircuit
 from .._simulation.circuit import Circuit, StandardCircuit
-
+from .._utility.simulations_utility import permute_to_adjacent, permute_back
 
 class MrAndersonSimulator(object):
     """
@@ -257,7 +257,7 @@ class MrAndersonSimulator(object):
             raise ValueError(f"Expected positive number of shots but found {shots}.")
 
         # Cross check number of qubits
-        # psi0 must match the number of **used** qubits
+        # psi0 must match the number of used qubits
         if psi0.shape != (2**nqubit,):
             raise ValueError(f"psi0 shape {psi0.shape} is incompatible with nqubit={nqubit} (expected {(2**nqubit,)}).")
 
@@ -368,6 +368,18 @@ class MrAndersonSimulator(object):
                 current_chunk.append(op)  # Also keep the rz in the chunk
             else:
                 # Normal operation (only if in layout)
+                # Check if this is a non-consecutive two-qubit gate
+                if len(q_idx) == 2:
+                    if abs(q_idx[0] - q_idx[1]) != 1:
+                        # Non-consecutive: flush current chunk first
+                        if current_chunk:
+                            data.append((current_chunk, 0))
+                            current_chunk = []
+                        # Flag as non-consecutive two-qubit gate
+                        data.append((op, 2))
+                        continue
+                
+                # Consecutive or single-qubit: normal path
                 current_chunk.append(op)
 
         # Flush final chunk if non-empty
@@ -672,13 +684,12 @@ def _single_shot(args: dict) -> np.array:
     circ.reset(phase_reset=True)  # Reset internal state before starting
     
     for idx, (d, flag) in enumerate(data):
-        if flag == 0:      
+        if flag == 0:    # Normal gates chunk: apply gates and update statevector  
             _apply_gates_on_circuit(d, circ, device_param, qubit_layout)
             psi = circ.statevector(psi)
             circ.reset(phase_reset=False)  # Reset internal state for next chunk
 
-        elif flag == 1:
-            
+        elif flag == 1: # Fancy gate: mid-circuit measurement, reset, or statevector readout
             if isinstance(d, tuple) and d[0] == "mid_measurement":
                 op = d[1]
                 qubits  = op["q_idx"]
@@ -750,12 +761,60 @@ def _single_shot(args: dict) -> np.array:
 
                 else:
                     raise ValueError(f"Unknown / not yet implemented gate: {op_name}")
+        
+        elif flag == 2: # Non-consecutive two-qubit gate: permute, apply, and permute back
+            n = circ.nqubit
+            # Unpack dict
+            T1, T2, p, rout, p_int, t_int, tm, dt = (
+                device_param["T1"],
+                device_param["T2"],
+                device_param["p"],
+                device_param["rout"],
+                device_param["p_int"],
+                device_param["t_int"],
+                device_param["tm"],
+                device_param["dt"][0]
+            )
+
+            q_ctr_r = d.qubits[0]._index
+            q_trg_r = d.qubits[1]._index
+            q_ctr_v = qubit_layout.index(q_ctr_r)
+            q_trg_v = qubit_layout.index(q_trg_r)
+            
+            # Permute psi so the two qubits are adjacent
+            psi_permuted, perm = permute_to_adjacent(psi, q_ctr_v, q_trg_v, n)
+            op_name = d.operation.name
+            # Apply gate at positions 0 and 1
+            if op_name == 'ecr':
+                circ.ECR(0, 1,
+                        t_int[q_ctr_r][q_trg_r],
+                        p_int[q_ctr_r][q_trg_r],
+                        p[q_ctr_v], p[q_trg_v],
+                        T1[q_ctr_v], T2[q_ctr_v],
+                        T1[q_trg_v], T2[q_trg_v])
+            elif op_name == 'cx':
+                circ.CNOT(0, 1,
+                        t_int[q_ctr_r][q_trg_r],
+                        p_int[q_ctr_r][q_trg_r],
+                        p[q_ctr_v], p[q_trg_v],
+                        T1[q_ctr_v], T2[q_ctr_v],
+                        T1[q_trg_v], T2[q_trg_v])
+            else:
+                raise ValueError(f"Unknown / not yet implemented gate: {op_name}")
+
+            for k in range(2, n):
+                circ.I(k)
+            
+            psi_permuted = circ.statevector(psi_permuted)
+            circ.reset(phase_reset=False)
     
+            # Permute psi back
+            psi = permute_back(psi_permuted, perm, n)
+            
     # Mid_measurement results in Qiskit clbit order
     qiskit_order_mid_results = mid_results[::-1]  
 
     # Final Measurements
-    # Calculate the probability distribution from the Born rule
     shot_result = np.square(np.abs(psi))
 
     # Final outcomes from last measurement

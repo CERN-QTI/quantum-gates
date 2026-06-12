@@ -246,6 +246,7 @@ def create_random_quantum_circuit(n_qubit: int, depth: int, seed_circ: int, meas
 
     return circ
 
+
 def transpile_qiskit_circuit(circ : QuantumCircuit, init_layout: list, seed: int, backend: Backend) -> QuantumCircuit:
         """Function to transpile a circuit using the optimal option for this backend.
 
@@ -304,6 +305,7 @@ def pretty_print_data(data):
                         f"qubits={[q._index for q in op.qubits]} "
                         f"clbits={[c._index for c in op.clbits]}"
                     )
+
 
 def sv_normal_to_qiskit(sv: np.ndarray | Statevector) -> np.ndarray:
 
@@ -619,3 +621,30 @@ def collapse_statevector(psi: np.ndarray, target_qubit: int, outcome: int, n: in
     collapse_mask = ((indices >> mask_pos) & 1) != outcome
     psi[collapse_mask] = 0.0
     return psi
+
+def permute_to_adjacent(psi: np.ndarray, q_ctr_v: int, q_trg_v: int, n: int) -> tuple[np.ndarray, list]:
+    """Permute psi so that q_ctr_v and q_trg_v are at positions 0 and 1.
+    Returns the permuted psi and the permutation used (needed to invert)."""
+    
+    # Build permutation: bring q_ctr_v to 0, q_trg_v to 1, rest in order
+    other = [k for k in range(n) if k != q_ctr_v and k != q_trg_v]
+    perm = [q_ctr_v, q_trg_v] + other
+    
+    # Reshape, transpose, reshape back
+    psi_tensor = psi.reshape([2] * n)
+    psi_tensor = np.transpose(psi_tensor, perm)
+    psi_permuted = psi_tensor.reshape(-1)
+    
+    return psi_permuted, perm
+
+
+def permute_back(psi: np.ndarray, perm: list, n: int) -> np.ndarray:
+    """Invert the permutation applied by permute_to_adjacent."""
+    
+    inv_perm = np.argsort(perm)
+    
+    psi_tensor = psi.reshape([2] * n)
+    psi_tensor = np.transpose(psi_tensor, inv_perm)
+    psi_back = psi_tensor.reshape(-1)
+    
+    return psi_back
